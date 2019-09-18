@@ -1,0 +1,2 @@
+python3 capture.py -r baselineTeam -b baselineTeam
+python3 capture.py -r baselineTeam -b baselineTeam --keys0
