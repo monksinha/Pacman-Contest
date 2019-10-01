@@ -32,8 +32,8 @@ class ReflexCaptureAgent(CaptureAgent):
     def registerInitialState(self, gameState):
         CaptureAgent.registerInitialState(self, gameState)
         self.home = gameState.getAgentState(self.index).getPosition()
-        self.originalFood = len(self.getFood(gameState).asList())
-        self.defendFood = len(self.getFoodYouAreDefending(gameState).asList())
+        self.food_list = len(self.getFood(gameState).asList())
+        self.defending_food_list = len(self.getFoodYouAreDefending(gameState).asList())
         self.walls = gameState.getWalls().asList()
         self.lastEaten = None
         self.eatenFood = None
@@ -211,7 +211,7 @@ class Guard(ReflexCaptureAgent):
         return closeEaten[0]
 
     def beginEaten(self):
-        if len(self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < self.defendFood:
+        if len(self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < self.defending_food_list:
             return True
         else:
             return False
@@ -228,7 +228,7 @@ class Guard(ReflexCaptureAgent):
             if self.getPreviousObservation() is not None:
                 if gameState.getAgentState(index).numReturned > self.getPreviousObservation().getAgentState(
                         index).numReturned:
-                    self.defendFood = self.defendFood - (gameState.getAgentState(
+                    self.defending_food_list = self.defending_food_list - (gameState.getAgentState(
                         index).numReturned - self.getPreviousObservation().getAgentState(index).numReturned)
 
         if gameState.getAgentState(self.index).getPosition() == middle or gameState.getAgentState(
