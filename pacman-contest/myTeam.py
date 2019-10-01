@@ -18,12 +18,32 @@ from captureAgents import CaptureAgent
 from distanceCalculator import manhattanDistance
 from game import Actions, Directions
 
-inf = float("inf")
-
+#################
+# Team creation #
+#################
 
 def createTeam(firstIndex, secondIndex, isRed, first='AStarAgent', second='AStarAgent'):
+    """
+      This function should return a list of two agents that will form the
+      team, initialized using firstIndex and secondIndex as their agent
+      index numbers.  isRed is True if the red team is being created, and
+      will be False if the blue team is being created.
+
+      As a potentially helpful development aid, this function can take
+      additional string-valued keyword arguments ("first" and "second" are
+      such arguments in the case of this function), which will come from
+      the --redOpts and --blueOpts command-line arguments to capture.py.
+      For the nightly contest, however, your team will be created without
+      any extra arguments, so you should make sure that the default
+      behavior is what you want for the nightly contest.
+      """
+
+    # The following line is an example only; feel free to change it.
     return [eval(first)(firstIndex, isRed, False), eval(second)(secondIndex, isRed, True)]
 
+##########
+# Agents #
+##########
 
 class AStarAgent(CaptureAgent, object):
     instances = [None, None]
@@ -39,26 +59,25 @@ class AStarAgent(CaptureAgent, object):
         self.defense = defense
         self.bound = None
         self.actions = None
-        self.escapes  = None
+        self.escapes = None
         self.teammates = None
         self.prev_pos = None
         self.follow_path = None
         self.mask_food = None
         self.oppo_food = None
         self._walls = None
-
         self.carry_food = 0
 
-        # record each instance created
+        # record instance
         self.instances[index // 2] = self
 
-    def registerInitialState(self, state):
+    def registerInitialState(self, gameState):
         """
         Initialise the agent and compute an initial route
         """
-        CaptureAgent.registerInitialState(self, state)
+        CaptureAgent.registerInitialState(self, gameState)
 
-        data = state.data
+        data = gameState.data
         layout = data.layout
         height = layout.height
         width = layout.width
@@ -81,19 +100,25 @@ class AStarAgent(CaptureAgent, object):
         # get an instance of the teammate
         self.teammates = self.instances[(self.index // 2 + 1) % 2]
 
-    def GetNextFood(self, state):
+    def chooseAction(self, gameState):
+        """
+        Choose an action based on the current status of the agent
+        """
+        return self.DefenseAction(gameState) if self.defense else self.AttackAction(gameState)
+
+    def GetNextFood(self, gameState):
         self.escapes = None
 
-        agentStates = state.data.agentStates
+        agentStates = gameState.data.agentStates
         red = self.red
 
         # determine the positions of the opponents
-        poss = [agentStates[i] for i in (state.blueTeam if red else state.redTeam)]
+        poss = [agentStates[i] for i in (gameState.blueTeam if red else gameState.redTeam)]
         # only agent which is a ghost and not scared will mask the food
         poss = [s.configuration.pos for s in poss if not s.isPacman and s.scaredTimer == 0]
 
         distancer = self.distancer
-        data = state.data
+        data = gameState.data
         layout = data.layout
         width = layout.width
         half = width // 2
@@ -124,7 +149,7 @@ class AStarAgent(CaptureAgent, object):
         if not leftFood:
             # start to escape asap if no foods left
             if not mark_food:
-                return self.GetNextEscape(state)
+                return self.GetNextEscape(gameState)
             # TODO: coordinate with defensive agent
             mfs = min((
                 (f, distancer.getDistance(pos, f))
@@ -137,7 +162,7 @@ class AStarAgent(CaptureAgent, object):
         actions = self.actions
         recompute = not actions or mark_food != self.mask_food
         walls = data.layout.walls.data
-        for i in (state.blueTeam if red else state.redTeam):
+        for i in (gameState.blueTeam if red else gameState.redTeam):
             agentState = agentStates[i]
             if not agentState.isPacman and agentState.scaredTimer == 0:
                 # pretend there are walls around the opponent agents if they are
@@ -187,29 +212,16 @@ class AStarAgent(CaptureAgent, object):
         if path:
             self.actions = path
         return Actions.vectorToDirection((nx - x, ny - y))
-    
+
     def observationFunction(self, gameState):
-        """
-        Abuse this function to obtain a full game state from the controller
-        We actually wrote an inference module in the inference.py but since this
-        is not explicitly disallowed in all documents so we decide to utilise
-        this design flaw in the final submission
-        """
-        # TODO: incorporate the inference module instead of abusing this flaw
         return gameState
 
-    def chooseAction(self, state):
-        """
-        Choose an action based on the current status of the agent
-        """
-        return self.DefenseAction(state) if self.defense else self.AttackAction(state)
-
-    def GetNextEscape(self, state):
+    def GetNextEscape(self, gameState):
         self.actions = None
 
         red = self.red
         index = self.index
-        data = state.data
+        data = gameState.data
         half = data.layout.width // 2
         agentStates = data.agentStates
         bounds = self.bound
@@ -219,7 +231,7 @@ class AStarAgent(CaptureAgent, object):
         escapes = self.escapes
         recompute = not escapes
         walls = data.layout.walls.data
-        for i in (state.blueTeam if red else state.redTeam):
+        for i in (gameState.blueTeam if red else gameState.redTeam):
             agentState = agentStates[i]
             if not agentState.isPacman and agentState.scaredTimer == 0:
                 # pretend there are walls around the opponent agents if they are
@@ -277,10 +289,10 @@ class AStarAgent(CaptureAgent, object):
             self.escapes = path
         return Actions.vectorToDirection((nx - x, ny - y))
 
-    def AttackAction(self, state):
+    def AttackAction(self, gameState):
         index = self.index
         red = self.red
-        agentStates = state.data.agentStates
+        agentStates = gameState.data.agentStates
         agentState = agentStates[index]
 
         distancer = self.distancer
@@ -300,11 +312,11 @@ class AStarAgent(CaptureAgent, object):
 
         # if escaping, finish escaping
         if self.escapes:
-            return self.GetNextEscape(state)
+            return self.GetNextEscape(gameState)
 
         states = [
             agentStates[i]
-            for i in (state.blueTeam if red else state.redTeam)
+            for i in (gameState.blueTeam if red else gameState.redTeam)
         ]
         # if determine to be in danger and currently carrying food, escape
         if any(
@@ -316,16 +328,16 @@ class AStarAgent(CaptureAgent, object):
             self.actions = None
             nc = self.carry_food = agentState.numCarrying
             if nc > 0:
-                return self.GetNextEscape(state)
+                return self.GetNextEscape(gameState)
 
         # find the closest food to eat, not necessary to be a TSP, this is just
         # a greedy strategy to eat the current closest food
-        return self.GetNextFood(state)
+        return self.GetNextFood(gameState)
 
-    def Chase(self, state, target):
+    def Chase(self, gameState, target):
         target = tuple(map(int, target))
 
-        agent = state.data.agentStates[self.index]
+        agent = gameState.data.agentStates[self.index]
         x, y = pos = tuple(map(int, agent.configuration.pos))
         distancer = self.distancer
 
@@ -380,10 +392,10 @@ class AStarAgent(CaptureAgent, object):
         self.follow_path = path if path else None
         return Actions.vectorToDirection((nx - x, ny - y))
 
-    def DefenseAction(self, state):
+    def DefenseAction(self, gameState):
         index = self.index
         red = self.red
-        data = state.data
+        data = gameState.data
         agentStates = data.agentStates
         distancer = self.distancer
         bounds = self.bound
@@ -406,7 +418,7 @@ class AStarAgent(CaptureAgent, object):
         target = None
         rs = []
         pnc = 0
-        for i in (state.blueTeam if red else state.redTeam):
+        for i in (gameState.blueTeam if red else gameState.redTeam):
             agentState = agentStates[i]
             nc = agentState.numCarrying
             npos = agentState.configuration.pos
@@ -426,14 +438,14 @@ class AStarAgent(CaptureAgent, object):
                     min(((s, min(distancer.getDistance(s, b) for b in bounds), distancer.getDistance(pos, s)) for s in
                          sur),
                         key=itemgetter(1, 2))[0]
-                return self.Chase(state, sel)
-            return self.Chase(state, target)
+                return self.Chase(gameState, sel)
+            return self.Chase(gameState, target)
 
         # if no agent carries food, select the closest one which is currently a
         # Pacman
         mb = None
-        mbd = (inf, inf)
-        md = inf
+        mbd = (float("inf"), float("inf"))
+        md = float("inf")
         for (b, bd), npos, pac in rs:
             dist = distancer.getDistance(npos, pos)
             if pac:
@@ -453,8 +465,8 @@ class AStarAgent(CaptureAgent, object):
                     min(((s, min(distancer.getDistance(s, b) for b in bounds), distancer.getDistance(pos, s)) for s in
                          sur),
                         key=itemgetter(1, 2))[0]
-                return self.Chase(state, sel)
-            return self.Chase(state, target)
+                return self.Chase(gameState, sel)
+            return self.Chase(gameState, target)
 
         # if both are still in their sides, just try to reach the closest bound
         # they could reach
@@ -463,7 +475,7 @@ class AStarAgent(CaptureAgent, object):
             sur = [(int(tx + cx), int(ty + cy)) for cx, cy in self.nearby]
             sur = [(x, y) for x, y in sur if 0 <= x < width and 0 <= y < height and not walls[x][y]]
             sel = \
-            min(((s, min(distancer.getDistance(s, b) for b in bounds), distancer.getDistance(pos, s)) for s in sur),
-                key=itemgetter(1, 2))[0]
-            return self.Chase(state, sel)
-        return self.Chase(state, mb)
+                min(((s, min(distancer.getDistance(s, b) for b in bounds), distancer.getDistance(pos, s)) for s in sur),
+                    key=itemgetter(1, 2))[0]
+            return self.Chase(gameState, sel)
+        return self.Chase(gameState, mb)
