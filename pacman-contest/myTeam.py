@@ -70,23 +70,13 @@ class ReflexCaptureAgent(CaptureAgent):
             closeCapsules = [c for c, d in zip(self.getCapsules(gameState), capsuleDis) if d == min(capsuleDis)]
             return closeCapsules[0]
 
-    def GetSuccessor(self, gameState, action):
-        successor = gameState.generateSuccessor(self.index, action)
-        pos = successor.getAgentState(self.index).getPosition()
-        if pos != nearestPoint(pos):
-            # Only half a grid position was covered
-            return successor.generateSuccessor(self.index, action)
-        else:
-            return successor
-
     def GetSuccessors(self, currentPosition):
         successors = []
-        forbidden = self.wall_list
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
             x, y = currentPosition
             dx, dy = Actions.directionToVector(action)
             nextx, nexty = int(x + dx), int(y + dy)
-            if (nextx, nexty) not in forbidden:
+            if (nextx, nexty) not in self.wall_list:
                 nextPosition = (nextx, nexty)
                 successors.append((nextPosition, action))
         return successors
