@@ -50,22 +50,16 @@ class ReflexCaptureAgent(CaptureAgent):
         else:
             return invaders
 
-    def getDefenders(self, gameState):
+    def GetGuardians(self, gameState):
         enemies = [gameState.getAgentState(o) for o in self.getOpponents(gameState)]
-        defenders = [a for a in enemies if a.getPosition() != None and not a.isPacman]
-        if len(defenders) == 0:
-            return None
-        else:
-            return defenders
+        guardians = [a for a in enemies if a.getPosition() != None and not a.isPacman]
+        return None if len(guardians) == 0 else guardians
 
-    def getCloseFood(self, gameState):
+    def GetNearbyFoods(self, gameState):
         foods = [food for food in self.getFood(gameState).asList()]
         foodDistance = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), a) for a in foods]
-        closeFood = [f for f, d in zip(foods, foodDistance) if d == min(foodDistance)]
-        if len(closeFood) == 0:
-            return None
-        else:
-            return closeFood[0]
+        nearby_foods = [f for f, d in zip(foods, foodDistance) if d == min(foodDistance)]
+        return None if not nearby_foods else nearby_foods[0]
 
     def getcloseCapsule(self, gameState):
         capsules = self.getCapsules(gameState)
@@ -102,7 +96,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def enemyConcernHeuristic(self, gameState, thisPosition):
         heuristics = []
-        ghoasts = self.getDefenders(gameState)
+        ghoasts = self.GetGuardians(gameState)
         if ghoasts == None:
             return 0
         else:
@@ -144,13 +138,13 @@ class Rush(ReflexCaptureAgent):
 
         closeCapsule = self.getcloseCapsule(gameState)
         foods = self.getFood(gameState).asList()
-        closeFood = self.getCloseFood(gameState)
+        nearby_foods = self.GetNearbyFoods(gameState)
         middleLines = self.GetInterval(gameState)
         middleDis = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mi) for mi in
                      middleLines]
         closeMiddle = [m for m, d in zip(middleLines, middleDis) if d == min(middleDis)]
         middle = closeMiddle[0]
-        defenders = self.getDefenders(gameState)
+        guardians = self.GetGuardians(gameState)
         invaders = self.GetOpponent(gameState)
 
         if gameState.getAgentState(self.index).scaredTimer > 0 and invaders != None and not gameState.getAgentState(
@@ -170,26 +164,26 @@ class Rush(ReflexCaptureAgent):
             if gameState.getAgentState(self.index).numCarrying > 0:
                 return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
 
-        if defenders != None:
-            for defender in defenders:
+        if guardians != None:
+            for defender in guardians:
                 if defender.scaredTimer > 0:
                     if defender.scaredTimer > 10:
-                        return self.aStarSearch(gameState, closeFood, self.simpleHeuristic)
+                        return self.aStarSearch(gameState, nearby_foods, self.simpleHeuristic)
                     else:
-                        return self.aStarSearch(gameState, closeFood, self.enemyConcernHeuristic)
+                        return self.aStarSearch(gameState, nearby_foods, self.enemyConcernHeuristic)
 
         if closeCapsule != None:
-            if defenders != None:
-                for d in defenders:
+            if guardians != None:
+                for d in guardians:
                     if self.getMazeDistance(d.getPosition(), closeCapsule) < 2:
                         return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
                 return self.aStarSearch(gameState, closeCapsule, self.enemyConcernHeuristic)
 
         if closeCapsule == None:
-            if defenders != None and gameState.getAgentState(self.index).numCarrying != 0:
+            if guardians != None and gameState.getAgentState(self.index).numCarrying != 0:
                 return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
 
-        return self.aStarSearch(gameState, closeFood, self.enemyConcernHeuristic)
+        return self.aStarSearch(gameState, nearby_foods, self.enemyConcernHeuristic)
 
 class Guard(ReflexCaptureAgent):
     def IsEating(self):
