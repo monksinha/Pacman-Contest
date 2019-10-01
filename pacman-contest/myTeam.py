@@ -34,13 +34,13 @@ class ReflexCaptureAgent(CaptureAgent):
         self.home = gameState.getAgentState(self.index).getPosition()
         self.food_list = len(self.getFood(gameState).asList())
         self.defending_food_list = len(self.getFoodYouAreDefending(gameState).asList())
-        self.walls = gameState.getWalls().asList()
-        self.lastEaten = None
-        self.eatenFood = None
+        self.wall_list = gameState.getWalls().asList()
+        self.last_eaten_food = None
+        self.eaten_foods = None
 
     def GetInterval(self, gameState):
         interval = [((gameState.data.layout.width / 2) - 1, y) for y in range(0, gameState.data.layout.height)] if self.red else [(gameState.data.layout.width / 2, y) for y in range(0, gameState.data.layout.height)]
-        return [a for a in interval if a not in self.walls]
+        return [a for a in interval if a not in self.wall_list]
 
     def GetOpponent(self, gameState):
         enemies = [gameState.getAgentState(o) for o in self.getOpponents(gameState)]
@@ -87,7 +87,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def getSuccessors(self, currentPosition):
         successors = []
-        forbidden = self.walls
+        forbidden = self.wall_list
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
             x, y = currentPosition
             dx, dy = Actions.directionToVector(action)
@@ -207,7 +207,7 @@ class Guard(ReflexCaptureAgent):
         eatenDis = [self.getMazeDistance(self.getCurrentObservation().getAgentState(self.index).getPosition(), eat) for
                     eat in eaten]
         closeEaten = [e for e, d in zip(eaten, eatenDis) if d == min(eatenDis)]
-        self.eatenFood = closeEaten[0]
+        self.eaten_foods = closeEaten[0]
         return closeEaten[0]
 
     def beginEaten(self):
@@ -232,7 +232,7 @@ class Guard(ReflexCaptureAgent):
                         index).numReturned - self.getPreviousObservation().getAgentState(index).numReturned)
 
         if gameState.getAgentState(self.index).getPosition() == middle or gameState.getAgentState(
-                self.index).getPosition() == self.eatenFood:
+                self.index).getPosition() == self.eaten_foods:
             return self.aStarSearch(gameState, self.home, self.simpleHeuristic)
 
         if gameState.getAgentState(self.index).scaredTimer > 0 and invaders != None:
@@ -252,9 +252,9 @@ class Guard(ReflexCaptureAgent):
         if self.beginEaten():
             if self.IsEating():
                 eaten = self.getEaten()
-                self.eatenFood = eaten
+                self.eaten_foods = eaten
                 return self.aStarSearch(gameState, eaten, self.simpleHeuristic)
             else:
-                return self.aStarSearch(gameState, self.eatenFood, self.simpleHeuristic)
+                return self.aStarSearch(gameState, self.eaten_foods, self.simpleHeuristic)
 
         return self.aStarSearch(gameState, middle, self.simpleHeuristic)
