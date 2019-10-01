@@ -112,7 +112,6 @@ class ReflexCaptureAgent(CaptureAgent):
                     heuristics.append(math.pow((d - 5), 4))
                 else:
                     heuristics.append(0)
-            print(max(heuristics))
             return max(heuristics)
 
     def aStarSearch(self, gameState, goal, heuristic):
@@ -152,7 +151,6 @@ class Rush(ReflexCaptureAgent):
         closeMiddle = [m for m, d in zip(middleLines, middleDis) if d == min(middleDis)]
         middle = closeMiddle[0]
         defenders = self.getDefenders(gameState)
-        print(self.getDefenders(gameState))
         invaders = self.GetOpponent(gameState)
 
         if gameState.getAgentState(self.index).scaredTimer > 0 and invaders != None and not gameState.getAgentState(
@@ -170,7 +168,6 @@ class Rush(ReflexCaptureAgent):
 
         if gameState.data.timeleft < 200 or len(foods) < 3 or gameState.getAgentState(self.index).numCarrying > 28:
             if gameState.getAgentState(self.index).numCarrying > 0:
-                print('go home, nearly end')
                 return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
 
         if defenders != None:
@@ -185,17 +182,13 @@ class Rush(ReflexCaptureAgent):
             if defenders != None:
                 for d in defenders:
                     if self.getMazeDistance(d.getPosition(), closeCapsule) < 2:
-                        print('enemy close to cap,back')
                         return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
-                print('eat cap')
                 return self.aStarSearch(gameState, closeCapsule, self.enemyConcernHeuristic)
 
         if closeCapsule == None:
             if defenders != None and gameState.getAgentState(self.index).numCarrying != 0:
-                print('chasen,back')
                 return self.aStarSearch(gameState, middle, self.enemyConcernHeuristic)
 
-        print('normal eat')
         return self.aStarSearch(gameState, closeFood, self.enemyConcernHeuristic)
 
 class Guard(ReflexCaptureAgent):
