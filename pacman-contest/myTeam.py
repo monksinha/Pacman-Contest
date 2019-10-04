@@ -36,7 +36,7 @@ class ReflexCaptureAgent(CaptureAgent):
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)
         stream_handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -\n%(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -\n%(message)s\n')
         stream_handler.setFormatter(formatter)
         self.logger.addHandler(stream_handler)
 
@@ -46,43 +46,52 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def registerInitialState(self, gameState):
         self.InitLogger()
-        self.Log(gameState)
+        # self.Log(gameState)
 
         CaptureAgent.registerInitialState(self, gameState)
         self.start_position = gameState.getAgentState(self.index).getPosition()
-        # self.Log(self.start_position)
         self.opponent_food_number = len(self.getFood(gameState).asList())
-        # self.Log(self.opponent_food_number)
         self.self_food_number = len(self.getFoodYouAreDefending(gameState).asList())
-        # self.Log(self.self_food_number)
         self.walls = gameState.getWalls().asList()
-        # self.Log(self.walls)
+        # self.Log(self.start_position, self.opponent_food_number, self.self_food_number, self.walls)
+
+        self.layout_height = gameState.data.layout.height
+        self.layout_width = gameState.data.layout.width
+        self.mid_points = []
+        for y in range(0, self.layout_height):
+            point = ((self.layout_width // 2) - (1 if self.red else 0), y)
+            if point not in self.walls:
+                self.mid_points.append(point)
+        # self.Log(self.mid_points)
+
         self.last_eaten_food = None
         self.eaten_foods = None
 
-    def GetIntervals(self, gameState):
-        intervals = [((gameState.data.layout.width / 2) - (1 if self.red else 0), y) for y in
-                     range(0, gameState.data.layout.height)]
-        return [interval for interval in intervals if interval not in self.walls]
+    def GetNearbyOpponentPacmans(self, gameState):
+        opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
+        nearby_opponent_pacmans = [op for op in opponents if op.isPacman and op.getPosition() != None]
+        # self.Log(nearby_opponent_pacmans)
+        return nearby_opponent_pacmans if nearby_opponent_pacmans else None
 
-    def GetOpponent(self, gameState):
-        enemies = [gameState.getAgentState(o) for o in self.getOpponents(gameState)]
-        invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]
-        if len(invaders) == 0:
-            return None
-        else:
-            return invaders
+    def GetNearbyOpponentGhosts(self, gameState):
+        opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
+        nearby_opponent_ghosts = [op for op in opponents if op.isPacman and op.getPosition() != None]
+        # self.Log(nearby_opponent_ghosts)
+        return nearby_opponent_ghosts if nearby_opponent_ghosts else None
 
-    def GetGuardians(self, gameState):
-        enemies = [gameState.getAgentState(o) for o in self.getOpponents(gameState)]
-        guardians = [a for a in enemies if a.getPosition() != None and not a.isPacman]
-        return None if len(guardians) == 0 else guardians
-
-    def GetNearbyFoods(self, gameState):
-        foods = [food for food in self.getFood(gameState).asList()]
-        foodDistance = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), a) for a in foods]
-        nearby_foods = [f for f, d in zip(foods, foodDistance) if d == min(foodDistance)]
-        return None if not nearby_foods else nearby_foods[0]
+    def GetNearestFood(self, gameState):
+        agent_position = gameState.getAgentState(self.index).getPosition()
+        remaining_foods = [food for food in self.getFood(gameState).asList()]
+        remaining_foods_distance = [self.getMazeDistance(agent_position, food) for food in remaining_foods]
+        min_distance = 999999
+        nearest_food = None
+        for i in range(len(remaining_foods_distance)):
+            distance = remaining_foods_distance[i]
+            if min_distance > distance:
+                min_distance = distance
+                nearest_food = remaining_foods[i]
+        self.Log(nearest_food)
+        return nearest_food
 
     def getcloseCapsule(self, gameState):
         capsules = self.getCapsules(gameState)
@@ -109,7 +118,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def DetectOpponentsHeuristic(self, gameState, thisPosition):
         heuristics = []
-        ghosts = self.GetGuardians(gameState)
+        ghosts = self.GetNearbyOpponentGhosts(gameState)
         if ghosts == None:
             return 0
         else:
@@ -151,14 +160,14 @@ class Rush(ReflexCaptureAgent):
 
         closeCapsule = self.getcloseCapsule(gameState)
         foods = self.getFood(gameState).asList()
-        nearby_foods = self.GetNearbyFoods(gameState)
-        middleLines = self.GetIntervals(gameState)
+        nearby_foods = self.GetNearestFood(gameState)
+        middleLines = self.mid_points
         middleDis = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mi) for mi in
                      middleLines]
         closeMiddle = [m for m, d in zip(middleLines, middleDis) if d == min(middleDis)]
         middle = closeMiddle[0]
-        guardians = self.GetGuardians(gameState)
-        invaders = self.GetOpponent(gameState)
+        guardians = self.GetNearbyOpponentGhosts(gameState)
+        invaders = self.GetNearbyOpponentPacmans(gameState)
 
         if gameState.getAgentState(self.index).scaredTimer > 0 and invaders != None and not gameState.getAgentState(
                 self.index).isPacman:
@@ -225,9 +234,9 @@ class Guard(ReflexCaptureAgent):
             return False
 
     def chooseAction(self, gameState):
-        invaders = self.GetOpponent(gameState)
+        invaders = self.GetNearbyOpponentPacmans(gameState)
 
-        middleLines = self.GetIntervals(gameState)
+        middleLines = self.mid_points
         middleDis = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mi) for mi in
                      middleLines]
         closeMiddle = [m for m, d in zip(middleLines, middleDis) if d == min(middleDis)]
