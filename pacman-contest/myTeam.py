@@ -93,14 +93,19 @@ class ReflexCaptureAgent(CaptureAgent):
         self.Log(nearest_food)
         return nearest_food
 
-    def getcloseCapsule(self, gameState):
+    def GetClosestCapsule(self, gameState):
+        agent_position = gameState.getAgentState(self.index).getPosition()
         capsules = self.getCapsules(gameState)
-        if len(capsules) == 0:
-            return None
-        else:
-            capsuleDis = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), c) for c in capsules]
-            closeCapsules = [c for c, d in zip(self.getCapsules(gameState), capsuleDis) if d == min(capsuleDis)]
-            return closeCapsules[0]
+        capsules_distance = [self.getMazeDistance(agent_position, capsule) for capsule in capsules]
+        min_distance = 999999
+        nearest_capsules = None
+        for i in range(len(capsules_distance)):
+            distance = capsules_distance[i]
+            if min_distance > distance:
+                min_distance = distance
+                nearest_capsules = capsules[i]
+        self.Log(capsules)
+        return capsules
 
     def GetSuccessors(self, currentPosition):
         successors = []
@@ -158,7 +163,7 @@ class Rush(ReflexCaptureAgent):
 
     def chooseAction(self, gameState):
 
-        closeCapsule = self.getcloseCapsule(gameState)
+        closeCapsule = self.GetClosestCapsule(gameState)
         foods = self.getFood(gameState).asList()
         nearby_foods = self.GetNearestFood(gameState)
         middleLines = self.mid_points
