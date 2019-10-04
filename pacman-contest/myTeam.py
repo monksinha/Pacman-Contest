@@ -90,7 +90,7 @@ class ReflexCaptureAgent(CaptureAgent):
             if min_distance > distance:
                 min_distance = distance
                 nearest_food = remaining_foods[i]
-        self.Log(nearest_food)
+        # self.Log(nearest_food)
         return nearest_food
 
     def GetNearestCapsule(self, gameState):
@@ -104,7 +104,7 @@ class ReflexCaptureAgent(CaptureAgent):
             if min_distance > distance:
                 min_distance = distance
                 nearest_capsules = capsules[i]
-        self.Log(nearest_capsules)
+        # self.Log(nearest_capsules)
         return nearest_capsules
 
     def GetSuccessors(self, position):
