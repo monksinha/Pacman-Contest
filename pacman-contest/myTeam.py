@@ -173,7 +173,8 @@ class Positive(ReflexCaptureAgent):
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
-        if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(self.index).scaredTimer == 0:
+        if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(
+                self.index).scaredTimer == 0:
             return self.waStarSearch(gameState, nearby_pacmans[0].getPosition(), self.DetectOpponentGhostsHeuristic)
 
         if nearby_ghosts:
