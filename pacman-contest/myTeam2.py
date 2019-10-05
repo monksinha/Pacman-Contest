@@ -145,7 +145,27 @@ class MctsAgent(CaptureAgent):
         minDistance = min([self.getMazeDistance(myPos, point) for point in self.midPoints])
         return minDistance
 
+    def mctSearch(self, gameState):
+        pass
+
+    def selection(self, gameState):
+        pass
+
+    def expansion(self, gameState):
+        pass
+
+    def simulation(self, gameState):
+        pass
+
+    def backPropagation(self, gameState):
+        pass
+
+
+###################
+# Offensive Agent #
+###################
 class OffensiveAgent(MctsAgent):
+    def chooseAction(self, gameState):
 
 
 
@@ -168,17 +188,17 @@ class OffensiveAgent(MctsAgent):
             return {'successorScore' : 20,
                     'distanceToFood': -5,
                     'distanceToCapsule': -10,
-                    'distanceToGhost': -50,
+                    'distanceToGhost': 50,
                     }
         else:
             return {'distanceToMid': -10,
-                    'distanceToGhost': -50
+                    'distanceToGhost': 50
                     }
 
 
-
-
-
+###################
+# Defensive Agent #
+###################
 class DefensiveAgent(MctsAgent):
     def getFeatures(self, gameState, action):
         features = util.Counter()
