@@ -17,13 +17,13 @@ from game import Directions, Actions
 from util import nearestPoint
 
 import logging
-MIN_POINT = 3
+MIN_CARRYING = 3
 
 #################
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Rush', second='Guard'):
+def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -157,52 +157,26 @@ class ReflexCaptureAgent(CaptureAgent):
                               successor_cost + weight * heuristic(gameState, successor_state))
         return 'Stop'
 
-class Rush(ReflexCaptureAgent):
+class Positive(ReflexCaptureAgent):
 
     def chooseAction(self, gameState):
         nearest_capsule = self.GetNearestCapsule(gameState)
-        foods = self.getFood(gameState).asList()
         nearest_food = self.GetNearestFood(gameState)
         mid_distances = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mid_point) for mid_point in self.mid_points]
         nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
-        opponent_ghosts = self.GetNearbyOpponentGhosts(gameState)
-        opponent_pacmans = self.GetNearbyOpponentPacmans(gameState)
+        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
-        if gameState.getAgentState(self.index).numCarrying + self.getScore(gameState) > MIN_POINT:
+        if nearby_ghosts:
+            return self.waStarSearch(gameState, nearest_capsule if nearest_capsule else nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+
+        if gameState.getAgentState(self.index).numCarrying >= MIN_CARRYING:
             return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
-
-        if not gameState.getAgentState(self.index).isPacman and opponent_pacmans != None and \
-                gameState.getAgentState(self.index).scaredTimer > 0:
-            for pacman in opponent_pacmans:
-                if self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), pacman.getPosition()) <= 2:
-                    return self.waStarSearch(gameState, self.start_position, self.DetectOpponentGhostsHeuristic)
-
-        if gameState.data.timeleft < 200 or len(foods) < 3 or gameState.getAgentState(self.index).numCarrying > 28:
-            if gameState.getAgentState(self.index).numCarrying > 0:
-                return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
-
-        if opponent_ghosts != None:
-            for ghost in opponent_ghosts:
-                if ghost.scaredTimer > 0:
-                    if ghost.scaredTimer > 10:
-                        return self.waStarSearch(gameState, nearest_food, self.nullHeuristic)
-                    else:
-                        return self.waStarSearch(gameState, nearest_food, self.DetectOpponentGhostsHeuristic)
-
-        if opponent_ghosts != None and nearest_capsule != None:
-            for d in opponent_ghosts:
-                if self.getMazeDistance(d.getPosition(), nearest_capsule) < 2:
-                    return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
-            return self.waStarSearch(gameState, nearest_capsule, self.DetectOpponentGhostsHeuristic)
-
-        if nearest_capsule == None:
-            if opponent_ghosts != None and gameState.getAgentState(self.index).numCarrying != 0:
-                return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
 
         return self.waStarSearch(gameState, nearest_food, self.DetectOpponentGhostsHeuristic)
 
 
-class Guard(ReflexCaptureAgent):
+class Negative(ReflexCaptureAgent):
     def IsEating(self):
         if self.getPreviousObservation() is not None and len(
                 self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < len(
@@ -228,7 +202,7 @@ class Guard(ReflexCaptureAgent):
             return False
 
     def chooseAction(self, gameState):
-        opponent_pacmans = self.GetNearbyOpponentPacmans(gameState)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
         self.mid_points = self.mid_points
         mid_distances = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mi) for mi in
@@ -246,18 +220,18 @@ class Guard(ReflexCaptureAgent):
                 self.index).getPosition() == self.eaten_foods:
             return self.waStarSearch(gameState, self.start_position, self.nullHeuristic)
 
-        if gameState.getAgentState(self.index).scaredTimer > 0 and opponent_pacmans != None:
-            for invader in opponent_pacmans:
+        if gameState.getAgentState(self.index).scaredTimer > 0 and nearby_pacmans != None:
+            for invader in nearby_pacmans:
                 if self.getMazeDistance(gameState.getAgentState(self.index).getPosition(),
                                         invader.getPosition()) <= 2:
                     return self.waStarSearch(gameState, self.start_position, self.DetectOpponentGhostsHeuristic)
 
-        if opponent_pacmans:
+        if nearby_pacmans:
             invadersDis = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), a.getPosition()) for
                            a in
-                           opponent_pacmans]
+                           nearby_pacmans]
             minDIs = min(invadersDis) if invadersDis else 0
-            target = [a.getPosition() for a, v in zip(opponent_pacmans, invadersDis) if v == minDIs]
+            target = [a.getPosition() for a, v in zip(nearby_pacmans, invadersDis) if v == minDIs]
             return self.waStarSearch(gameState, target[0], self.nullHeuristic)
 
         if self.beginEaten():
