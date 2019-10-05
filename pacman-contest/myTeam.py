@@ -17,7 +17,9 @@ from game import Directions, Actions
 from util import nearestPoint
 
 import logging
-MIN_CARRYING = 3
+
+MIN_CARRYING = 1
+
 
 #################
 # Team creation #
@@ -69,13 +71,15 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
-        nearby_opponent_pacmans = [opponent for opponent in opponents if opponent.isPacman and opponent.getPosition() != None]
+        nearby_opponent_pacmans = [opponent for opponent in opponents if
+                                   opponent.isPacman and opponent.getPosition() != None]
         # self.Log(nearby_opponent_pacmans)
         return nearby_opponent_pacmans
 
     def GetNearbyOpponentGhosts(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
-        nearby_opponent_ghosts = [opponent for opponent in opponents if not opponent.isPacman and opponent.getPosition() != None]
+        nearby_opponent_ghosts = [opponent for opponent in opponents if
+                                  not opponent.isPacman and opponent.getPosition() != None]
         # self.Log(nearby_opponent_ghosts)
         return nearby_opponent_ghosts
 
@@ -122,7 +126,7 @@ class ReflexCaptureAgent(CaptureAgent):
         heuristics = [0]
         ghosts = self.GetNearbyOpponentGhosts(gameState)
         for ghost in ghosts:
-            heuristics.append(999999 if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2 else 0) # < 2
+            heuristics.append(999999 if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2 else 0)  # < 2
         return max(heuristics)
 
     class Node:
@@ -157,18 +161,29 @@ class ReflexCaptureAgent(CaptureAgent):
                               successor_cost + weight * heuristic(gameState, successor_state))
         return 'Stop'
 
+
 class Positive(ReflexCaptureAgent):
 
     def chooseAction(self, gameState):
         nearest_capsule = self.GetNearestCapsule(gameState)
         nearest_food = self.GetNearestFood(gameState)
-        mid_distances = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mid_point) for mid_point in self.mid_points]
+        mid_distances = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mid_point) for
+                         mid_point in self.mid_points]
         nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
+        if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(self.index).scaredTimer == 0:
+            return self.waStarSearch(gameState, nearby_pacmans[0].getPosition(), self.DetectOpponentGhostsHeuristic)
+
         if nearby_ghosts:
-            return self.waStarSearch(gameState, nearest_capsule if nearest_capsule else nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+            for ghost in nearby_ghosts:
+                if ghost.scaredTimer > 0:
+                    return self.waStarSearch(gameState, ghost.getPosition(), self.DetectOpponentGhostsHeuristic)
+            if nearest_capsule:
+                return self.waStarSearch(gameState, nearest_capsule, self.DetectOpponentGhostsHeuristic)
+            else:
+                return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
 
         if gameState.getAgentState(self.index).numCarrying >= MIN_CARRYING:
             return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
@@ -206,7 +221,7 @@ class Negative(ReflexCaptureAgent):
 
         self.mid_points = self.mid_points
         mid_distances = [self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), mi) for mi in
-                     self.mid_points]
+                         self.mid_points]
         nearest_mid_point = [m for m, d in zip(self.mid_points, mid_distances) if d == min(mid_distances)]
         nearest_mid_point = nearest_mid_point[0]
         for index in self.getOpponents(gameState):
