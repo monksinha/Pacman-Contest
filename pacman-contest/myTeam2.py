@@ -313,21 +313,8 @@ class MctsAgent(CaptureAgent):
 ###################
 class OffensiveAgent(MctsAgent):
     # def chooseAction(self, gameState):
-    #     # You can profile your evaluation time by uncommenting these lines
-    #     start = time.time()
-    #     currNode = self.mctSearch(gameState, NUM_ITERATIONS)
-    #     avgRewards = []
-    #     for child in currNode.children:
-    #         avgReward = child.avgReward()
-    #         avgRewards.append(avgReward)
-    #     maxReward = max(avgRewards)
-    #     candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
-    #     nextNode = random.choice(candidateNodes)
-    #     nextState = nextNode.gameState
-    #     action = nextState.getAgentState(self.index).configuration.direction
-    #     print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
-    #     print(action)
-    #     return action
+
+
 
     def getFeatures(self, gameState, action):
         features = util.Counter()
@@ -386,20 +373,7 @@ class OffensiveAgent(MctsAgent):
 ###################
 class DefensiveAgent(MctsAgent):
     # def chooseAction(self, gameState):
-    #     start = time.time()
-    #     currNode = self.mctSearch(gameState, NUM_ITERATIONS)
-    #     avgRewards = []
-    #     for child in currNode.children:
-    #         avgReward = child.avgReward()
-    #         avgRewards.append(avgReward)
-    #     maxReward = max(avgRewards)
-    #     candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
-    #     nextNode = random.choice(candidateNodes)
-    #     nextState = nextNode.gameState
-    #     action = nextState.getAgentState(self.index).configuration.direction
-    #     # print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
-    #     # print(action)
-    #     return action
+
 
 
     def getFeatures(self, gameState, action):
