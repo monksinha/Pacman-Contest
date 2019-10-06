@@ -18,7 +18,7 @@ from util import nearestPoint
 
 import logging
 
-MIN_CARRYING = 1
+MIN_CARRYING = 2
 
 
 #################
