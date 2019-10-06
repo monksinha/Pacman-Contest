@@ -110,35 +110,25 @@ class MctsAgent(CaptureAgent):
         CaptureAgent.registerInitialState(self, gameState)
 
     def chooseAction(self, gameState):
-        """
-        Picks among the actions with the highest Q(s,a).
-        """
+        start = time.time()
+        currNode = self.mctSearch(gameState, NUM_ITERATIONS)
+        avgRewards = []
+        for child in currNode.children:
+            avgReward = child.avgReward()
+            avgRewards.append(avgReward)
+        maxReward = max(avgRewards)
+        candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
+        nextNode = random.choice(candidateNodes)
+        nextState = nextNode.gameState
+        action = nextState.getAgentState(self.index).configuration.direction
+        print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
+        print(action)
+        return action
 
-        actions = gameState.getLegalActions(self.index)
 
-        # You can profile your evaluation time by uncommenting these lines
-        # start = time.time()
-        values = [self.evaluate(gameState, a) for a in actions]
-        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
-
-        maxValue = max(values)
-        bestActions = [a for a, v in zip(actions, values) if v == maxValue]
-
-        foodLeft = len(self.getFood(gameState).asList())
-
-        if foodLeft <= 2:
-            bestDist = 9999
-            for action in actions:
-                successor = self.getSuccessor(gameState, action)
-                pos2 = successor.getAgentPosition(self.index)
-                dist = self.getMazeDistance(self.start, pos2)
-                if dist < bestDist:
-                    bestAction = action
-                    bestDist = dist
-            return bestAction
-
-        return random.choice(bestActions)
-
+    #####################
+    # Getter Functions  #
+    #####################
     def getSuccessor(self, gameState, action):
         """
         Finds the next successor which is a grid position (location tuple).
@@ -187,33 +177,46 @@ class MctsAgent(CaptureAgent):
     def getGhostDistance(self, gameState):
         myPos = gameState.getAgentPosition(self.index)
         enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
-        enemyGhosts = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
-        if len(enemyGhosts) >0:
-            minDistance = min([self.getMazeDistance(myPos, food) for food in enemyGhosts])
+        ghostList = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
+        if len(ghostList) > 0:
+            distances = [self.getMazeDistance(myPos, ghost) for ghost in ghostList]
+            return distances
         else:
-            minDistance = None
-        return minDistance
+            return None
+
+    def getInvaderDistance(self, gameState):
+        myPos = gameState.getAgentPosition(self.index)
+        enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
+        invaderList = [a.getPosition() for a in enemies if a.isPacman and a.getPosition() != None]
+        if len(invaderList) >0:
+            distances = [self.getMazeDistance(myPos, invader) for invader in invaderList]
+            return distances
+        else:
+            return None
 
     def getFoodDistance(self, gameState):
         myPos = gameState.getAgentPosition(self.index)
         foodList = self.getFood(gameState).asList()
         if len(foodList)>0:
-            minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
+            distances = [self.getMazeDistance(myPos, food) for food in foodList]
+            return distances
         else:
-            minDistance = None
-        return minDistance
+            return None
 
     def getCapsuleDistance(self, gameState):
         myPos = gameState.getAgentPosition(self.index)
         capsuleList = self.getCapsules(gameState)
         if len(capsuleList) > 0:
-            minDistance = min([self.getMazeDistance(myPos, capsule) for capsule in capsuleList])
+            distances = [self.getMazeDistance(myPos, capsule) for capsule in capsuleList]
+            return distances
         else:
-            minDistance = None
-        return minDistance
+            return None
 
     def getNumOfFoods(self, gameState):
         return self.getFood(gameState).count()
+
+    def getNumOfFoodsDefending(self, gameState):
+        return self.getFoodYouAreDefending(gameState).count()
 
     def getDistanceToMid(self, gameState):
         myPos = gameState.getAgentPosition(self.index)
@@ -236,6 +239,9 @@ class MctsAgent(CaptureAgent):
         else:
             return 0
 
+    #############################
+    # Monte Carlo Tree functions#
+    #############################
     def mctSearch(self, gameState, iteration):
         rootNode = TreeNode(gameState)
 
@@ -306,42 +312,45 @@ class MctsAgent(CaptureAgent):
 # Offensive Agent #
 ###################
 class OffensiveAgent(MctsAgent):
-    def chooseAction(self, gameState):
-        # You can profile your evaluation time by uncommenting these lines
-        start = time.time()
-        currNode = self.mctSearch(gameState, NUM_ITERATIONS)
-        avgRewards = []
-        for child in currNode.children:
-            avgReward = child.avgReward()
-            avgRewards.append(avgReward)
-        maxReward = max(avgRewards)
-        candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
-        nextNode = random.choice(candidateNodes)
-        nextState = nextNode.gameState
-        action = nextState.getAgentState(self.index).configuration.direction
-        print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
-        print(action)
-        return action
+    # def chooseAction(self, gameState):
+    #     # You can profile your evaluation time by uncommenting these lines
+    #     start = time.time()
+    #     currNode = self.mctSearch(gameState, NUM_ITERATIONS)
+    #     avgRewards = []
+    #     for child in currNode.children:
+    #         avgReward = child.avgReward()
+    #         avgRewards.append(avgReward)
+    #     maxReward = max(avgRewards)
+    #     candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
+    #     nextNode = random.choice(candidateNodes)
+    #     nextState = nextNode.gameState
+    #     action = nextState.getAgentState(self.index).configuration.direction
+    #     print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
+    #     print(action)
+    #     return action
 
     def getFeatures(self, gameState, action):
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
 
-        # myState = successor.getAgentState(self.index)
+        myState = successor.getAgentState(self.index)
         # myPos = myState.getPosition()
         reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
         foodDistance = self.getFoodDistance(successor)
-        capsuleDistance= self.getCapsuleDistance(successor)
+        capsuleDistance = self.getCapsuleDistance(successor)
         ghostDistance = self.getGhostDistance(successor)
 
+        if myState.isPacman:
+            features['onAttack'] = 1
 
-        features['successorScore'] = -self.getNumOfFoods(successor)
+
+        features['foodsLeft'] = self.getNumOfFoods(successor)
         if foodDistance is not None:
-            features['distanceToFood'] = foodDistance
+            features['distanceToFood'] = min(foodDistance)
         if capsuleDistance is not None:
-            features['distanceToCapsule'] = capsuleDistance
+            features['distanceToCapsule'] = min(capsuleDistance)
         if ghostDistance is not None:
-            features['distanceToGhost'] = ghostDistance
+            features['distanceToGhost'] = min(ghostDistance)
         features['distanceToMid'] = self.getDistanceToMid(successor)
         features['scaredTime'] = self.getEnemyScaredTimer(successor)
         features['stop'] = 1 if action == Directions.STOP else 0
@@ -353,19 +362,22 @@ class OffensiveAgent(MctsAgent):
 
     def getWeights(self, gameState, action):
         if gameState.getAgentState(self.index).numCarrying <= 3:
-            return {'successorScore': 100,
+            return {'foodsLeft': -100,
                     'distanceToFood': -50,
                     'distanceToCapsule': -50,
                     'distanceToGhost': 1000,
+                    'scaredTime': 100,
                     'stop': -100,
-                    'reverse': -10
+                    'reverse': -100,
+                    'onAttack': 100
                     }
         else:
             return {'distanceToMid': - 50,
                     'distanceToStart': -50,
                     'distanceToGhost': 1000,
                     'stop': -100,
-                    'reverse': -10
+                    'reverse': -100,
+                    'onAttack': -100
                     }
 
 
@@ -373,30 +385,54 @@ class OffensiveAgent(MctsAgent):
 # Defensive Agent #
 ###################
 class DefensiveAgent(MctsAgent):
+    # def chooseAction(self, gameState):
+    #     start = time.time()
+    #     currNode = self.mctSearch(gameState, NUM_ITERATIONS)
+    #     avgRewards = []
+    #     for child in currNode.children:
+    #         avgReward = child.avgReward()
+    #         avgRewards.append(avgReward)
+    #     maxReward = max(avgRewards)
+    #     candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
+    #     nextNode = random.choice(candidateNodes)
+    #     nextState = nextNode.gameState
+    #     action = nextState.getAgentState(self.index).configuration.direction
+    #     # print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
+    #     # print(action)
+    #     return action
+
+
     def getFeatures(self, gameState, action):
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
 
         myState = successor.getAgentState(self.index)
-        myPos = myState.getPosition()
+        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
+        invaderDistance = self.getInvaderDistance(successor)
 
-        # Computes whether we're on defense (1) or offense (0)
-        features['onDefense'] = 1
-        if myState.isPacman: features['onDefense'] = 0
+        if not myState.isPacman:
+            features['onDefense'] = 1
 
-        # Computes distance to invaders we can see
-        enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
-        invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]
-        features['numInvaders'] = len(invaders)
-        if len(invaders) > 0:
-            dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
-            features['invaderDistance'] = min(dists)
+        if invaderDistance is not None:
+            features['numInvaders'] = len(invaderDistance)
+            features['invaderDistance'] = min(invaderDistance)
 
-        if action == Directions.STOP: features['stop'] = 1
-        rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-        if action == rev: features['reverse'] = 1
+        if action == Directions.STOP:
+            features['stop'] = 1
+        if action == reverse:
+            features['reverse'] = 1
+
+        features['foodDefending'] = self.getNumOfFoodsDefending(successor)
+        features['distanceToMid'] = self.getDistanceToMid(successor)
 
         return features
 
     def getWeights(self, gameState, action):
-        return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
+        return {'foodDefending': 100,
+                'numInvaders': -1000,
+                'onDefense': 100,
+                'invaderDistance': -50,
+                'stop': -100,
+                'reverse': -100,
+                'distanceToMid': -50
+                }
