@@ -12,401 +12,264 @@
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
 from captureAgents import CaptureAgent
-import distanceCalculator
-import random, time, util, sys
-from game import Directions
-import game
-# import numpy as np
-import math
+import util, math
+from game import Directions, Actions
 from util import nearestPoint
 
-NUM_ITERATIONS = 100
+import logging
+
+MIN_CARRYING = 2
+
 
 #################
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed,
-               first = 'OffensiveAgent', second = 'DefensiveAgent'):
-  """
-  This function should return a list of two agents that will form the
-  team, initialized using firstIndex and secondIndex as their agent
-  index numbers.  isRed is True if the red team is being created, and
-  will be False if the blue team is being created.
-
-  As a potentially helpful development aid, this function can take
-  additional string-valued keyword arguments ("first" and "second" are
-  such arguments in the case of this function), which will come from
-  the --redOpts and --blueOpts command-line arguments to capture.py.
-  For the nightly contest, however, your team will be created without
-  any extra arguments, so you should make sure that the default
-  behavior is what you want for the nightly contest.
-  """
-  return [eval(first)(firstIndex), eval(second)(secondIndex)]
+def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
+    return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
-#########################
-# Monte Carlo Tree Node #
-#########################
+##########
+# Agents #
+##########
 
-class TreeNode:
-    def __init__(self, gameState, simulationStep=10):
-        self.gameState = gameState
-        self.simluationStep = simulationStep
-        self.visitTime = 0
-        self.reward = 0.0
-        self.parent = None
-        self.children = None
+class ReflexCaptureAgent(CaptureAgent):
+    def InitLogger(self):
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.DEBUG)
+        stream_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -\n%(message)s\n')
+        stream_handler.setFormatter(formatter)
+        self.logger.addHandler(stream_handler)
 
-    def __str__(self):
-        str = 'reward: %f, visited: %d times' %(self.reward, self.visitTime)
-        return str
+    def Log(self, *iterables):
+        for iter in iterables:
+            self.logger.debug('{}'.format(iter))
 
-    def __eq__(self, other):
-        if other == None: return False
-        if not self.gameState == other.gameState: return False
-        if not self.simluationStep == other.simluationStep: return False
-        if not self.visitTime == other.visitTime: return False
-        if not self.reward == other.reward: return False
-        if not self.parent == other.parent: return False
-        if not self.children == other.children: return False
-        return True
-
-    def setParent(self, parent):
-        self.parent = parent
-
-    def addChildren(self, child):
-        # self.children.append(child)
-        child.setParent(self)
-        if self.children is not None:
-            self.children.append(child)
-        else:
-            self.children = [child]
-
-    def update(self, reward):
-        self.reward += reward
-        self.visitTime += 1
-
-    def visited(self):
-        return self.visitTime > 0
-
-    def avgReward(self):
-        return self.reward/float(self.visitTime)
-
-
-
-#####################
-# Agents Base Class #
-#####################
-class MctsAgent(CaptureAgent):
     def registerInitialState(self, gameState):
-        self.start = gameState.getAgentPosition(self.index)
-
-        midLine = [(gameState.data.layout.width//2-1, y) for y in range(0, gameState.data.layout.height)] if self.red \
-            else [(gameState.data.layout.width//2, y) for y in range(0, gameState.data.layout.height)]
-
-        self.midPoints = [(x,y) for (x,y) in midLine if not gameState.hasWall(x,y)]
+        self.InitLogger()
+        # self.Log(gameState)
 
         CaptureAgent.registerInitialState(self, gameState)
+        self.start_position = gameState.getAgentState(self.index).getPosition()
+        self.opponent_food_list = self.getFood(gameState).asList()
+        self.food_list = self.getFoodYouAreDefending(gameState).asList()
+        self.walls = gameState.getWalls().asList()
+        # self.Log(self.start_position, self.opponent_food_number, self.self_food_number, self.walls)
 
-    def chooseAction(self, gameState):
-        start = time.time()
-        currNode = self.mctSearch(gameState, NUM_ITERATIONS)
-        avgRewards = []
-        for child in currNode.children:
-            avgReward = child.avgReward()
-            avgRewards.append(avgReward)
-        maxReward = max(avgRewards)
-        candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
-        nextNode = random.choice(candidateNodes)
-        nextState = nextNode.gameState
-        action = nextState.getAgentState(self.index).configuration.direction
-        print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
-        print(action)
-        return action
+        self.layout_height = gameState.data.layout.height
+        self.layout_width = gameState.data.layout.width
+        self.mid_points = []
+        for y in range(0, self.layout_height):
+            point = ((self.layout_width // 2) - (1 if self.red else 0), y)
+            if point not in self.walls:
+                self.mid_points.append(point)
+        # self.Log(self.mid_points)
 
+        self.eaten_foods = []
+        self.nearest_eaten_food = None
 
-    #####################
-    # Getter Functions  #
-    #####################
-    def getSuccessor(self, gameState, action):
-        """
-        Finds the next successor which is a grid position (location tuple).
-        """
-        successor = gameState.generateSuccessor(self.index, action)
-        pos = successor.getAgentState(self.index).getPosition()
-        if pos != nearestPoint(pos):
-            # Only half a grid position was covered
-            return successor.generateSuccessor(self.index, action)
-        else:
-            return successor
+    def GetNearbyOpponentPacmans(self, gameState):
+        opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
+        nearby_opponent_pacmans = [opponent for opponent in opponents if
+                                   opponent.isPacman and opponent.getPosition() != None]
+        # self.Log(nearby_opponent_pacmans)
+        return nearby_opponent_pacmans
 
-    def getSuccessors(self, gameState):
-        '''
-        Finds all possible successor states for the current state
-        '''
-        actions = gameState.getLegalActions(self.index)
-        actions.remove(Directions.STOP)
-        successors = [self.getSuccessor(gameState, action) for action in actions]
+    def GetNearbyOpponentGhosts(self, gameState):
+        opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
+        nearby_opponent_ghosts = [opponent for opponent in opponents if
+                                  not opponent.isPacman and opponent.getPosition() != None]
+        # self.Log(nearby_opponent_ghosts)
+        return nearby_opponent_ghosts
+
+    def GetNearestObject(self, objects, distances):
+        min_distance = 999999
+        nearest_object = None
+        for i in range(len(distances)):
+            distance = distances[i]
+            if min_distance > distance:
+                min_distance = distance
+                nearest_object = objects[i]
+        return nearest_object
+
+    def GetNearestFood(self, gameState):
+        agent_position = gameState.getAgentState(self.index).getPosition()
+        remaining_foods = [food for food in self.getFood(gameState).asList()]
+        remaining_foods_distances = [self.getMazeDistance(agent_position, food) for food in remaining_foods]
+        nearest_food = self.GetNearestObject(remaining_foods, remaining_foods_distances)
+        # self.Log(nearest_food)
+        return nearest_food
+
+    def GetNearestCapsule(self, gameState):
+        agent_position = gameState.getAgentState(self.index).getPosition()
+        capsules = self.getCapsules(gameState)
+        capsules_distances = [self.getMazeDistance(agent_position, capsule) for capsule in capsules]
+        nearest_capsules = self.GetNearestObject(capsules, capsules_distances)
+        # self.Log(nearest_capsules)
+        return nearest_capsules
+
+    def GetSuccessors(self, position):
+        successors = []
+        for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            x, y = position
+            dx, dy = Actions.directionToVector(action)
+            next_position = (int(x + dx), int(y + dy))
+            if next_position not in self.walls:
+                successors.append((next_position, action))
         return successors
 
-    def evaluate(self, gameState, action):
-        """
-        Computes a linear combination of features and feature weights
-        """
-        features = self.getFeatures(gameState, action)
-        weights = self.getWeights(gameState, action)
-        return features * weights
+    def nullHeuristic(self, gameState, thisPosition):
+        return 0
 
-    def getFeatures(self, gameState, action):
-        """
-        Returns a counter of features for the state
-        """
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-        features['successorScore'] = self.getScore(successor)
-        return features
+    def DetectOpponentGhostsHeuristic(self, gameState, thisPosition):
+        heuristics = [0]
+        ghosts = self.GetNearbyOpponentGhosts(gameState)
+        for ghost in ghosts:
+            heuristics.append(999999 if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2 else 0)  # < 2
+        return max(heuristics)
 
-    def getWeights(self, gameState, action):
-        """
-        Normally, weights do not depend on the gamestate.  They can be either
-        a counter or a dictionary.
-        """
-        return {'successorScore': 1.0}
+    class Node:
+        def __init__(self, states, path, cost=0):
+            self.states = states
+            self.path = path
+            self.cost = cost
 
-    def getGhostDistance(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
-        ghostList = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
-        if len(ghostList) > 0:
-            distances = [self.getMazeDistance(myPos, ghost) for ghost in ghostList]
-            return distances
+    def waStarSearch(self, gameState, goalState, heuristic=nullHeuristic):
+        start_position = self.getCurrentObservation().getAgentState(self.index).getPosition()
+        weight = 2
+        heap = util.PriorityQueue()
+        heap.push(self.Node([start_position], [], 0), 0)
+        visited = {start_position: 0}
+        while not heap.isEmpty():
+            node = heap.pop()
+            states = node.states
+            state = states[-1]
+            path = node.path
+            cost = node.cost
+            if state == goalState:
+                return path[0] if path else 'Stop'
+            for successor in self.GetSuccessors(state):
+                successor_state = successor[0]
+                successor_direction = successor[1]
+                successor_cost = cost + heuristic(gameState, successor_state)
+                if successor_state not in visited or visited[successor_state] > successor_cost:
+                    visited[successor_state] = successor_cost
+                    successor_states = states[:] + [successor_state]
+                    successor_path = path[:] + [successor_direction]
+                    heap.push(self.Node(successor_states, successor_path, successor_cost),
+                              successor_cost + weight * heuristic(gameState, successor_state))
+        return 'Stop'
+
+
+class Positive(ReflexCaptureAgent):
+
+    def chooseAction(self, gameState):
+        current_position = gameState.getAgentState(self.index).getPosition()
+        mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
+        nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
+        nearest_capsule = self.GetNearestCapsule(gameState)
+        nearest_food = self.GetNearestFood(gameState)
+        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
+
+        if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(
+                self.index).scaredTimer == 0:
+            return self.waStarSearch(gameState, nearby_pacmans[0].getPosition(), self.DetectOpponentGhostsHeuristic)
+
+        if nearby_ghosts:
+            for ghost in nearby_ghosts:
+                if ghost.scaredTimer > 0:
+                    return self.waStarSearch(gameState, ghost.getPosition(), self.DetectOpponentGhostsHeuristic)
+            if nearest_capsule:
+                return self.waStarSearch(gameState, nearest_capsule, self.DetectOpponentGhostsHeuristic)
+            else:
+                return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+
+        if gameState.getAgentState(self.index).numCarrying >= MIN_CARRYING:
+            return self.waStarSearch(gameState, nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+
+        return self.waStarSearch(gameState, nearest_food, self.DetectOpponentGhostsHeuristic)
+
+
+class Negative(ReflexCaptureAgent):
+    def GetFoodEatenByOpponent(self):
+        current_state = self.getCurrentObservation()
+        current_position = current_state.getAgentState(self.index).getPosition()
+        previous_state = self.getPreviousObservation()
+        if previous_state:
+            current_foods = self.getFoodYouAreDefending(current_state).asList()
+            previous_foods = self.getFoodYouAreDefending(previous_state).asList()
+            eaten_foods = [food for food in previous_foods if food not in current_foods]
+            self.Log(eaten_foods)
+            if eaten_foods:
+                eaten_foods_distance = [self.getMazeDistance(current_position, food) for food in eaten_foods]
+                self.nearest_eaten_food = self.GetNearestObject(eaten_foods, eaten_foods_distance)
+                if self.nearest_eaten_food != None:
+                    self.eaten_foods.append(self.nearest_eaten_food)
+
+    def IsOpponentEating(self):
+        current_foods = self.getFoodYouAreDefending( self.getCurrentObservation()).asList()
+        return len(current_foods) < len(self.food_list)
+
+    def IsEating(self):
+        if self.getPreviousObservation() is not None and len(
+                self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < len(
+            self.getFoodYouAreDefending(self.getPreviousObservation()).asList()):
+            return True
         else:
-            return None
+            return False
 
-    def getInvaderDistance(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
-        invaderList = [a.getPosition() for a in enemies if a.isPacman and a.getPosition() != None]
-        if len(invaderList) >0:
-            distances = [self.getMazeDistance(myPos, invader) for invader in invaderList]
-            return distances
+    # get the closest food eaten
+    def getEaten(self):
+        defendLeft = self.getFoodYouAreDefending(self.getCurrentObservation()).asList()
+        lastDefend = self.getFoodYouAreDefending(self.getPreviousObservation()).asList()
+        eaten = [left for left in lastDefend if left not in defendLeft]
+        # self.Log(eaten)
+        eatenDis = [self.getMazeDistance(self.getCurrentObservation().getAgentState(self.index).getPosition(), eat) for
+                    eat in eaten]
+        closeEaten = [e for e, d in zip(eaten, eatenDis) if d == min(eatenDis)]
+        self.eaten_foods = closeEaten[0]
+        return closeEaten[0]
+
+    # check if any food has been eaten
+    def beginEaten(self):
+        if len(self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < len(self.food_list):
+            return True
         else:
-            return None
-
-    def getFoodDistance(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        foodList = self.getFood(gameState).asList()
-        if len(foodList)>0:
-            distances = [self.getMazeDistance(myPos, food) for food in foodList]
-            return distances
-        else:
-            return None
-
-    def getCapsuleDistance(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        capsuleList = self.getCapsules(gameState)
-        if len(capsuleList) > 0:
-            distances = [self.getMazeDistance(myPos, capsule) for capsule in capsuleList]
-            return distances
-        else:
-            return None
-
-    def getNumOfFoods(self, gameState):
-        return self.getFood(gameState).count()
-
-    def getNumOfFoodsDefending(self, gameState):
-        return self.getFoodYouAreDefending(gameState).count()
-
-    def getDistanceToMid(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        minDistance = min([self.getMazeDistance(myPos, point) for point in self.midPoints])
-        return minDistance
-
-    def getDistanceToStart(self, gameState):
-        myPos = gameState.getAgentPosition(self.index)
-        distance = self.getMazeDistance(myPos,self.start)
-        return distance
-
-    def getEnemyScaredTimer(self, gameState):
-        enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
-        enemyGhosts = [a for a in enemies if not a.isPacman and a.getPosition() != None]
-        timer = []
-        for ghost in enemyGhosts:
-            timer.append(ghost.scaredTimer)
-        if len(timer) > 0:
-            return min(timer)
-        else:
-            return 0
-
-    #############################
-    # Monte Carlo Tree functions#
-    #############################
-    def mctSearch(self, gameState, iteration):
-        rootNode = TreeNode(gameState)
-
-        for t in range(iteration):
-            currNode = self.selection(rootNode)
-            if currNode.visited() or currNode == rootNode:
-                # print("expansion")
-                currNode = self.expansion(currNode)
-            currReward = self.simulation(currNode)
-            self.backPropagation(currNode, currReward)
-
-        return rootNode
-
-    def ucbValue(self, currNode, rho = 1.0, Q0 = math.inf):
-        if currNode.visited():
-            confidence = math.sqrt(rho * math.log(currNode.parent.visitTime) / currNode.visitTime)
-            ucbValue = currNode.reward + confidence
-        else:
-            ucbValue = Q0
-        return ucbValue
-
-    def selection(self, currNode):
-        # while len(currNode.children) > 0:
-        while currNode.children is not None:
-            children = currNode.children
-            ucbValues = [self.ucbValue(child) for child in children]
-            maxValue = max(ucbValues)
-            candidateNodes = [child for child, value in zip(children, ucbValues) if value == maxValue]
-            currNode = random.choice(candidateNodes)
-            # print(currNode)
-        return currNode
+            return False
 
 
-    def expansion(self, currNode):
-        successors = self.getSuccessors(currNode.gameState)
-        for successor in successors:
-            child = TreeNode(successor)
-            currNode.addChildren(child)
-        currNode = random.choice(currNode.children)
-        return currNode
+    def chooseAction(self, gameState):
+        current_state = gameState.getAgentState(self.index)
+        current_position = current_state.getPosition()
+        mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
+        nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
+        nearby_pacmans_distance = [self.getMazeDistance(current_position, pacman.getPosition()) for pacman in nearby_pacmans]
+        nearest_pacman = self.GetNearestObject(nearby_pacmans, nearby_pacmans_distance)
+        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+        self.GetFoodEatenByOpponent()
+        # self.Log(nearby_pacmans)
+        # self.Log(nearest_pacman)
 
+        if self.nearest_eaten_food != None and current_position == self.nearest_eaten_food:
+            return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
 
-    def simulation(self, currNode, discount = 0.9):
-        gameState = currNode.gameState
-        totalRewards = 0
-        step = currNode.simluationStep
-        while step > 0:
-            actions = gameState.getLegalActions(self.index)
-            actions.remove(Directions.STOP)
-            nextAction = random.choice(actions)
-            power = currNode.simluationStep - step
-            totalRewards += discount**power * self.evaluate(gameState, nextAction)
-            successor = self.getSuccessor(gameState, nextAction)
-            gameState = successor
-            step -= 1
-        return totalRewards
+        if current_position == nearest_mid_point or current_position == self.eaten_foods:
+            return self.waStarSearch(gameState, self.start_position, self.nullHeuristic)
 
+        if nearby_pacmans:
+            if current_state.scaredTimer > 0:
+                for pacman in nearby_pacmans:
+                    if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
+                        return self.waStarSearch(gameState, self.start_position, self.DetectOpponentGhostsHeuristic)
+            if nearby_pacmans is not None:
+                return self.waStarSearch(gameState, nearby_pacmans, self.DetectOpponentGhostsHeuristic)
+            return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
 
-    def backPropagation(self, currNode, reward):
-        while currNode is not None:
-            currNode.update(reward)
-            currNode = currNode.parent
+        self.Log(self.nearest_eaten_food)
+        if self.nearest_eaten_food is not None:
+            return self.waStarSearch(gameState, self.nearest_eaten_food, self.DetectOpponentGhostsHeuristic)
 
-
-
-
-###################
-# Offensive Agent #
-###################
-class OffensiveAgent(MctsAgent):
-    # def chooseAction(self, gameState):
-
-
-
-    def getFeatures(self, gameState, action):
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-
-        myState = successor.getAgentState(self.index)
-        # myPos = myState.getPosition()
-        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-        foodDistance = self.getFoodDistance(successor)
-        capsuleDistance = self.getCapsuleDistance(successor)
-        ghostDistance = self.getGhostDistance(successor)
-
-        if myState.isPacman:
-            features['onAttack'] = 1
-
-
-        features['foodsLeft'] = self.getNumOfFoods(successor)
-        if foodDistance is not None:
-            features['distanceToFood'] = min(foodDistance)
-        if capsuleDistance is not None:
-            features['distanceToCapsule'] = min(capsuleDistance)
-        if ghostDistance is not None:
-            features['distanceToGhost'] = min(ghostDistance)
-        features['distanceToMid'] = self.getDistanceToMid(successor)
-        features['scaredTime'] = self.getEnemyScaredTimer(successor)
-        features['stop'] = 1 if action == Directions.STOP else 0
-        features['reverse'] = 1 if action == reverse else 0
-        features['distanceToStart'] = self.getDistanceToStart(successor)
-
-        return features
-
-
-    def getWeights(self, gameState, action):
-        if gameState.getAgentState(self.index).numCarrying <= 3:
-            return {'foodsLeft': -100,
-                    'distanceToFood': -50,
-                    'distanceToCapsule': -50,
-                    'distanceToGhost': 1000,
-                    'scaredTime': 100,
-                    'stop': -100,
-                    'reverse': -100,
-                    'onAttack': 100
-                    }
-        else:
-            return {'distanceToMid': - 50,
-                    'distanceToStart': -50,
-                    'distanceToGhost': 1000,
-                    'stop': -100,
-                    'reverse': -100,
-                    'onAttack': -100
-                    }
-
-
-###################
-# Defensive Agent #
-###################
-class DefensiveAgent(MctsAgent):
-    # def chooseAction(self, gameState):
-
-
-
-    def getFeatures(self, gameState, action):
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-
-        myState = successor.getAgentState(self.index)
-        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-        invaderDistance = self.getInvaderDistance(successor)
-
-        if not myState.isPacman:
-            features['onDefense'] = 1
-
-        if invaderDistance is not None:
-            features['numInvaders'] = len(invaderDistance)
-            features['invaderDistance'] = min(invaderDistance)
-
-        if action == Directions.STOP:
-            features['stop'] = 1
-        if action == reverse:
-            features['reverse'] = 1
-
-        features['foodDefending'] = self.getNumOfFoodsDefending(successor)
-        features['distanceToMid'] = self.getDistanceToMid(successor)
-
-        return features
-
-    def getWeights(self, gameState, action):
-        return {'foodDefending': 100,
-                'numInvaders': -1000,
-                'onDefense': 100,
-                'invaderDistance': -50,
-                'stop': -100,
-                'reverse': -100,
-                'distanceToMid': -50
-                }
+        return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
