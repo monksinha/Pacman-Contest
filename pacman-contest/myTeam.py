@@ -66,8 +66,8 @@ class ReflexCaptureAgent(CaptureAgent):
                 self.mid_points.append(point)
         # self.Log(self.mid_points)
 
-        self.last_eaten_food = None
-        self.eaten_foods = None
+        self.eaten_foods = []
+        self.nearest_eaten_food = None
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.getOpponents(gameState)]
@@ -201,15 +201,15 @@ class Negative(ReflexCaptureAgent):
             current_foods = self.getFoodYouAreDefending(current_state).asList()
             previous_foods = self.getFoodYouAreDefending(previous_state).asList()
             eaten_foods = [food for food in previous_foods if food not in current_foods]
+            self.Log(eaten_foods)
             if eaten_foods:
                 eaten_foods_distance = [self.getMazeDistance(current_position, food) for food in eaten_foods]
-                nearest_eaten_food = self.GetNearestObject(eaten_foods, eaten_foods_distance)
-                return nearest_eaten_food
-        return None
+                self.nearest_eaten_food = self.GetNearestObject(eaten_foods, eaten_foods_distance)
+                if self.nearest_eaten_food != None:
+                    self.eaten_foods.append(self.nearest_eaten_food)
 
     def IsOpponentEating(self):
-        current_state = self.getCurrentObservation()
-        current_foods = self.getFoodYouAreDefending(current_state).asList()
+        current_foods = self.getFoodYouAreDefending( self.getCurrentObservation()).asList()
         return len(current_foods) < len(self.food_list)
 
     def IsEating(self):
@@ -224,7 +224,7 @@ class Negative(ReflexCaptureAgent):
         defendLeft = self.getFoodYouAreDefending(self.getCurrentObservation()).asList()
         lastDefend = self.getFoodYouAreDefending(self.getPreviousObservation()).asList()
         eaten = [left for left in lastDefend if left not in defendLeft]
-        self.Log(eaten)
+        # self.Log(eaten)
         eatenDis = [self.getMazeDistance(self.getCurrentObservation().getAgentState(self.index).getPosition(), eat) for
                     eat in eaten]
         closeEaten = [e for e, d in zip(eaten, eatenDis) if d == min(eatenDis)]
@@ -246,10 +246,12 @@ class Negative(ReflexCaptureAgent):
         nearby_pacmans_distance = [self.getMazeDistance(current_position, pacman.getPosition()) for pacman in nearby_pacmans]
         nearest_pacman = self.GetNearestObject(nearby_pacmans, nearby_pacmans_distance)
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
-        nearest_eaten_food = self.GetFoodEatenByOpponent()
+        self.GetFoodEatenByOpponent()
+        # self.Log(nearby_pacmans)
         # self.Log(nearest_pacman)
 
-        self.food_list = self.getFood(gameState).asList()
+        if self.nearest_eaten_food != None and current_position == self.nearest_eaten_food:
+            return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
 
         if current_position == nearest_mid_point or current_position == self.eaten_foods:
             return self.waStarSearch(gameState, self.start_position, self.nullHeuristic)
@@ -259,11 +261,12 @@ class Negative(ReflexCaptureAgent):
                 for pacman in nearby_pacmans:
                     if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
                         return self.waStarSearch(gameState, self.start_position, self.DetectOpponentGhostsHeuristic)
-            if nearest_pacman:
-                return self.waStarSearch(gameState, nearest_pacman, self.DetectOpponentGhostsHeuristic)
+            if nearby_pacmans is not None:
+                return self.waStarSearch(gameState, nearby_pacmans, self.DetectOpponentGhostsHeuristic)
             return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
 
-        if nearest_eaten_food:
-            return self.waStarSearch(gameState, nearest_eaten_food, self.DetectOpponentGhostsHeuristic)
+        self.Log(self.nearest_eaten_food)
+        if self.nearest_eaten_food is not None:
+            return self.waStarSearch(gameState, self.nearest_eaten_food, self.DetectOpponentGhostsHeuristic)
 
         return self.waStarSearch(gameState, nearest_mid_point, self.nullHeuristic)
