@@ -16,6 +16,8 @@ import distanceCalculator
 import random, time, util, sys
 from game import Directions
 import game
+# import numpy as np
+import math
 from util import nearestPoint
 
 #################
@@ -59,8 +61,12 @@ class TreeNode:
         self.children.append(child)
         child.setParent(self)
 
+    def update(self, reward):
+        self.reward += reward
+        self.count += 1
 
-
+    def visited(self):
+        return self.count > 0
 
 #####################
 # Agents Base Class #
@@ -94,6 +100,14 @@ class MctsAgent(CaptureAgent):
         else:
             return successor
 
+    def getSuccessors(self, gameState):
+        '''
+        Finds all possible successor states for the current state
+        '''
+        actions = gameState.getLegalActions(self.index)
+        successors = [self.getSuccessor(gameState, action) for action in actions]
+        return successors
+
     def evaluate(self, gameState, action):
         """
         Computes a linear combination of features and feature weights
@@ -121,8 +135,8 @@ class MctsAgent(CaptureAgent):
     def getGhostDistance(self, gameState):
         myPos = gameState.getAgentPosition(self.index)
         enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
-        enemy_ghosts = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
-        minDistance = min([self.getMazeDistance(myPos, food) for food in enemy_ghosts])
+        enemyGhosts = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
+        minDistance = min([self.getMazeDistance(myPos, food) for food in enemyGhosts])
         return minDistance
 
     def getFoodDistance(self, gameState):
@@ -145,20 +159,71 @@ class MctsAgent(CaptureAgent):
         minDistance = min([self.getMazeDistance(myPos, point) for point in self.midPoints])
         return minDistance
 
-    def mctSearch(self, gameState):
-        pass
+    def mctSearch(self, gameState, iteration):
+        depth = 20
+        rootNode = TreeNode(gameState,0, 0.0)
 
-    def selection(self, gameState):
-        pass
+        for t in range(iteration):
+            currNode = self.selection(rootNode)
+            if currNode.visited():
+                currNode = self.expansion(currNode)
+            currReward = self.simulation(currNode, depth, gameState)
+            self.backPropagation(currNode,currReward)
 
-    def expansion(self, gameState):
-        pass
+        return rootNode
 
-    def simulation(self, gameState):
-        pass
 
-    def backPropagation(self, gameState):
-        pass
+    def getEnemyScaredTimer(self, gameState):
+        enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
+        enemyGhosts = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
+        timer = []
+        for ghost in enemyGhosts:
+            timer.append(gameState.getAgentState(ghost.index).scaredTimer)
+        return min(timer)
+
+
+    def selection(self, currNode):
+        while len(currNode.children)>0:
+            children = currNode.children
+            ucbValues = [self.ucbValue(child) for child in children]
+            maxValue = max(ucbValues)
+            candidateNodes = [child for child, value in zip(children,ucbValues) if value == maxValue]
+            currNode = random.choice(candidateNodes)
+        return currNode
+
+
+    def expansion(self, currNode):
+        successors = self.getSuccessors(currNode.gameState)
+        for successor in successors:
+            currNode.addChildren(TreeNode(successor, 0, 0.0))
+        currNode = currNode.children[0]
+        return currNode
+
+
+    def simulation(self, currNode, depth, gameState, discount = 0.9):
+        totalRewards = 0
+        while depth > 0:
+            actions = gameState.getLegalActions(self.index)
+            nextAction = random.choice(actions)
+            totalRewards = totalRewards * discount + self.evaluate(gameState, nextAction)
+            successor = self.getSuccessor(gameState, nextAction)
+            gameState = successor
+            depth -= 1
+        return totalRewards
+
+
+    def backPropagation(self, currNode, reward):
+        while currNode is not None:
+            currNode.update(reward)
+            currNode = currNode.parent
+
+    def ucbValue(self, currNode, rho = 1.0, Q0 = math.inf):
+        if currNode.visited():
+            confidence = math.sqrt(rho * math.log(currNode.parent.count) / currNode.count)
+            ucbValue = currNode.reward + confidence
+        else:
+            ucbValue = Q0
+        return ucbValue
 
 
 ###################
@@ -166,7 +231,7 @@ class MctsAgent(CaptureAgent):
 ###################
 class OffensiveAgent(MctsAgent):
     def chooseAction(self, gameState):
-
+        pass
 
 
     def getFeatures(self, gameState, action):
@@ -175,12 +240,16 @@ class OffensiveAgent(MctsAgent):
 
         # myState = successor.getAgentState(self.index)
         # myPos = myState.getPosition()
+        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
 
         features['successorScore'] = -self.getNumOfFoods(successor)
         features['distanceToFood'] = self.getFoodDistance(successor)
         features['distanceToCapsule'] = self.getCapsuleDistance(successor)
         features['distanceToGhost'] = self.getGhostDistance(successor)
         features['distanceToMid'] = self.getDistanceToMid(successor)
+        features['scaredTime'] = self.getEnemyScaredTimer(successor)
+        features['stop'] = 1 if action == Directions.STOP else 0
+        features['reverse'] = 1 if action == reverse else 0
 
 
     def getWeights(self, gameState, action):
@@ -189,10 +258,14 @@ class OffensiveAgent(MctsAgent):
                     'distanceToFood': -5,
                     'distanceToCapsule': -10,
                     'distanceToGhost': 50,
+                    'stop': -100,
+                    'reverse':  -2
                     }
         else:
             return {'distanceToMid': -10,
-                    'distanceToGhost': 50
+                    'distanceToGhost': 50,
+                    'stop': -100,
+                    'reverse': -2
                     }
 
 
