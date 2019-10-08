@@ -49,7 +49,7 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Monte Carlo Tree Node #
 #########################
 class TreeNode:
-    def __init__(self, gameState, simulationStep= 10):
+    def __init__(self, gameState, simulationStep= 5):
         '''
         simulationStep: how far we want to simulate in MCT
         visitTime: how many times the node is visited
@@ -288,19 +288,25 @@ class MctsAgent(CaptureAgent):
     # Monte Carlo Tree functions #
     ##############################
     # https://www.youtube.com/watch?v=UXW2yZndl7U, algorithm implemented based on idea from this video
-    def mctSearch(self, gameState, iteration):
+    def mctSearch(self, gameState, iterations):
         '''
         build the search tree in a fixed number of iteration
         '''
+        start = time.time()
         rootNode = TreeNode(gameState)
 
-        for t in range(iteration):
+        while True:
+            # if exceeds either the time limit or iteration limit, stop building the tree
+            current = time.time()
+            if iterations == 0 or current - start > 0.9:
+                break
             currNode = self.selection(rootNode)
             if currNode.visited() or currNode == rootNode:
                 # print("expansion")
                 currNode = self.expansion(currNode)
             currReward = self.simulation(currNode)
             self.backPropagation(currNode, currReward)
+            iterations -= 1
 
         return rootNode
 
@@ -415,6 +421,7 @@ class OffensiveAgent(MctsAgent):
 
         features['distanceToStart'] = self.getDistanceToStart(successor)
 
+        # high penalty for death
         features['isDead'] = 1 if self.isDead(gameState, successor) else 0
 
 
@@ -480,19 +487,18 @@ class DefensiveAgent(MctsAgent):
     def getWeights(self, gameState, action):
         if self.getGhostDistance(gameState) is None:
             return {
-                    'distanceToBoundary': -20,
-                    'invaderDistance': -5,
-                    'crossed': -100,
+                    'distanceToBoundary': -10,
+                    'invaderDistance': -10,
+                    'onDefense': 100,
                     'stop': -10,
                     'reverse': -10,
                     'distanceToStart': 10
                     }
 
         return {'foodDefending': 10,
-                'numInvaders': -100,
-                'onDefense': 10,
-                'invaderDistance': -5,
+                'numInvaders': -1000,
+                'onDefense': 100,
+                'invaderDistance': -10,
                 'stop': -10,
                 'reverse': -10,
-                'crossed': -100
                 }
