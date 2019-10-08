@@ -48,9 +48,13 @@ def createTeam(firstIndex, secondIndex, isRed,
 #########################
 # Monte Carlo Tree Node #
 #########################
-
 class TreeNode:
-    def __init__(self, gameState, simulationStep=10):
+    def __init__(self, gameState, simulationStep= 10):
+        '''
+        simulationStep: how far we want to simulate in MCT
+        visitTime: how many times the node is visited
+        reward: accumulated reward for the node
+        '''
         self.gameState = gameState
         self.simluationStep = simulationStep
         self.visitTime = 0
@@ -99,13 +103,13 @@ class TreeNode:
 # Agents Base Class #
 #####################
 class MctsAgent(CaptureAgent):
+
     def registerInitialState(self, gameState):
         self.start = gameState.getAgentPosition(self.index)
 
-        midLine = [(gameState.data.layout.width//2-1, y) for y in range(0, gameState.data.layout.height)] if self.red \
-            else [(gameState.data.layout.width//2, y) for y in range(0, gameState.data.layout.height)]
+        self.midX = gameState.data.layout.width//2-1 if self.red else gameState.data.layout.width//2
 
-        self.midPoints = [(x,y) for (x,y) in midLine if not gameState.hasWall(x,y)]
+        self.boundary = [(self.midX ,y) for y in range(gameState.data.layout.height) if not gameState.hasWall(self.midX, y)]
 
         CaptureAgent.registerInitialState(self, gameState)
 
@@ -121,14 +125,10 @@ class MctsAgent(CaptureAgent):
         nextNode = random.choice(candidateNodes)
         nextState = nextNode.gameState
         action = nextState.getAgentState(self.index).configuration.direction
-        print ('eval time for agent %d: %.4f' % (self.index, time.time() - start))
+        print('eval time for agent %d: %.4f' % (self.index, time.time() - start))
         print(action)
         return action
 
-
-    #####################
-    # Getter Functions  #
-    #####################
     def getSuccessor(self, gameState, action):
         """
         Finds the next successor which is a grid position (location tuple).
@@ -174,7 +174,14 @@ class MctsAgent(CaptureAgent):
         """
         return {'successorScore': 1.0}
 
+
+    ####################
+    # Helper Functions #
+    ####################
     def getGhostDistance(self, gameState):
+        '''
+        :return: the distances from current agent to the enemy ghosts
+        '''
         myPos = gameState.getAgentPosition(self.index)
         enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
         ghostList = [a.getPosition() for a in enemies if not a.isPacman and a.getPosition() != None]
@@ -185,6 +192,9 @@ class MctsAgent(CaptureAgent):
             return None
 
     def getInvaderDistance(self, gameState):
+        '''
+        :return: the distances from current agent to enemy pacmans
+        '''
         myPos = gameState.getAgentPosition(self.index)
         enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
         invaderList = [a.getPosition() for a in enemies if a.isPacman and a.getPosition() != None]
@@ -195,6 +205,9 @@ class MctsAgent(CaptureAgent):
             return None
 
     def getFoodDistance(self, gameState):
+        '''
+        :return: the distances from current agent to all Food in enemy territory
+        '''
         myPos = gameState.getAgentPosition(self.index)
         foodList = self.getFood(gameState).asList()
         if len(foodList)>0:
@@ -204,6 +217,9 @@ class MctsAgent(CaptureAgent):
             return None
 
     def getCapsuleDistance(self, gameState):
+        '''
+        :return: the distances from current agent to all Capsules in enemy territory
+        '''
         myPos = gameState.getAgentPosition(self.index)
         capsuleList = self.getCapsules(gameState)
         if len(capsuleList) > 0:
@@ -213,22 +229,37 @@ class MctsAgent(CaptureAgent):
             return None
 
     def getNumOfFoods(self, gameState):
+        '''
+        :return: the current number of food in enemy territory
+        '''
         return self.getFood(gameState).count()
 
     def getNumOfFoodsDefending(self, gameState):
+        '''
+        :return: the current number of food in our territory
+        '''
         return self.getFoodYouAreDefending(gameState).count()
 
-    def getDistanceToMid(self, gameState):
+    def getDistanceToBoundary(self, gameState):
+        '''
+        :return: the closet distance to the boundary
+        '''
         myPos = gameState.getAgentPosition(self.index)
-        minDistance = min([self.getMazeDistance(myPos, point) for point in self.midPoints])
+        minDistance = min([self.getMazeDistance(myPos, point) for point in self.boundary])
         return minDistance
 
     def getDistanceToStart(self, gameState):
+        '''
+        :return: the distance to the starting point of our agent
+        '''
         myPos = gameState.getAgentPosition(self.index)
         distance = self.getMazeDistance(myPos,self.start)
         return distance
 
     def getEnemyScaredTimer(self, gameState):
+        '''
+        :return: if enemy ghost is scared, return the scared time left, else return 0
+        '''
         enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
         enemyGhosts = [a for a in enemies if not a.isPacman and a.getPosition() != None]
         timer = []
@@ -239,10 +270,28 @@ class MctsAgent(CaptureAgent):
         else:
             return 0
 
-    #############################
-    # Monte Carlo Tree functions#
-    #############################
+    def isDead(self, prevState, currState):
+        '''
+        :return: True if the current agent is eaten by enemy ghost
+        '''
+        currPos = currState.getAgentPosition(self.index)
+        prevPos = prevState.getAgentPosition(self.index)
+        distance = self.getMazeDistance(currPos, prevPos)
+        if currPos is self.start and distance > 10:
+            return True
+        else:
+            return False
+
+
+
+    ##############################
+    # Monte Carlo Tree functions #
+    ##############################
+    # https://www.youtube.com/watch?v=UXW2yZndl7U, algorithm implemented based on idea from this video
     def mctSearch(self, gameState, iteration):
+        '''
+        build the search tree in a fixed number of iteration
+        '''
         rootNode = TreeNode(gameState)
 
         for t in range(iteration):
@@ -256,14 +305,21 @@ class MctsAgent(CaptureAgent):
         return rootNode
 
     def ucbValue(self, currNode, rho = 1.0, Q0 = math.inf):
+        '''
+        rho: hyperparameter to balance between exploration and exploitation
+        Q0:  default value if the node is not visited
+        '''
         if currNode.visited():
-            confidence = math.sqrt(rho * math.log(currNode.parent.visitTime) / currNode.visitTime)
-            ucbValue = currNode.reward + confidence
+            confidenceInterval = math.sqrt(rho * math.log(currNode.parent.visitTime) / currNode.visitTime)
+            ucbValue = currNode.avgReward() + confidenceInterval
         else:
             ucbValue = Q0
         return ucbValue
 
     def selection(self, currNode):
+        '''
+        select node based on the ucb value, keeps searching down the tree until we reach the leaf node
+        '''
         # while len(currNode.children) > 0:
         while currNode.children is not None:
             children = currNode.children
@@ -276,6 +332,9 @@ class MctsAgent(CaptureAgent):
 
 
     def expansion(self, currNode):
+        '''
+        expand the node, add children, and randomly select a child
+        '''
         successors = self.getSuccessors(currNode.gameState)
         for successor in successors:
             child = TreeNode(successor)
@@ -285,6 +344,9 @@ class MctsAgent(CaptureAgent):
 
 
     def simulation(self, currNode, discount = 0.9):
+        '''
+        simulate game by randomly choosing next action until we reach the step limit
+        '''
         gameState = currNode.gameState
         totalRewards = 0
         step = currNode.simluationStep
@@ -301,6 +363,9 @@ class MctsAgent(CaptureAgent):
 
 
     def backPropagation(self, currNode, reward):
+        '''
+        update reward for the node and its parents
+        '''
         while currNode is not None:
             currNode.update(reward)
             currNode = currNode.parent
@@ -330,41 +395,52 @@ class OffensiveAgent(MctsAgent):
         if myState.isPacman:
             features['onAttack'] = 1
 
-
         features['foodsLeft'] = self.getNumOfFoods(successor)
         if foodDistance is not None:
             features['distanceToFood'] = min(foodDistance)
+
         if capsuleDistance is not None:
             features['distanceToCapsule'] = min(capsuleDistance)
+
         if ghostDistance is not None:
             features['distanceToGhost'] = min(ghostDistance)
-        features['distanceToMid'] = self.getDistanceToMid(successor)
+
+        features['distanceToBoundary'] = self.getDistanceToBoundary(successor)
+
         features['scaredTime'] = self.getEnemyScaredTimer(successor)
+
         features['stop'] = 1 if action == Directions.STOP else 0
+
         features['reverse'] = 1 if action == reverse else 0
+
         features['distanceToStart'] = self.getDistanceToStart(successor)
+
+        features['isDead'] = 1 if self.isDead(gameState, successor) else 0
+
 
         return features
 
 
     def getWeights(self, gameState, action):
         if gameState.getAgentState(self.index).numCarrying <= 3:
-            return {'foodsLeft': -100,
-                    'distanceToFood': -50,
-                    'distanceToCapsule': -50,
-                    'distanceToGhost': 1000,
-                    'scaredTime': 100,
-                    'stop': -100,
-                    'reverse': -100,
-                    'onAttack': 100
+            return {'foodsLeft': -10,
+                    'distanceToFood': -5,
+                    'distanceToCapsule': -5,
+                    'distanceToGhost': 100,
+                    'scaredTime': 10,
+                    'stop': -10,
+                    'reverse': -10,
+                    'onAttack': 100,
+                    'isDead': -1000,
                     }
         else:
-            return {'distanceToMid': - 50,
-                    'distanceToStart': -50,
-                    'distanceToGhost': 1000,
-                    'stop': -100,
-                    'reverse': -100,
-                    'onAttack': -100
+            return {'distanceToBoundary': -10,
+                    'distanceToStart': -10,
+                    'distanceToGhost': 100,
+                    'stop': -10,
+                    'reverse': -10,
+                    'onAttack': -10,
+                    'isDead': -1000
                     }
 
 
@@ -397,16 +473,26 @@ class DefensiveAgent(MctsAgent):
             features['reverse'] = 1
 
         features['foodDefending'] = self.getNumOfFoodsDefending(successor)
-        features['distanceToMid'] = self.getDistanceToMid(successor)
+        features['distanceToBoundary'] = self.getDistanceToBoundary(successor)
 
         return features
 
     def getWeights(self, gameState, action):
-        return {'foodDefending': 100,
-                'numInvaders': -1000,
-                'onDefense': 100,
-                'invaderDistance': -50,
-                'stop': -100,
-                'reverse': -100,
-                'distanceToMid': -50
+        if self.getGhostDistance(gameState) is None:
+            return {
+                    'distanceToBoundary': -20,
+                    'invaderDistance': -5,
+                    'crossed': -100,
+                    'stop': -10,
+                    'reverse': -10,
+                    'distanceToStart': 10
+                    }
+
+        return {'foodDefending': 10,
+                'numInvaders': -100,
+                'onDefense': 10,
+                'invaderDistance': -5,
+                'stop': -10,
+                'reverse': -10,
+                'crossed': -100
                 }
