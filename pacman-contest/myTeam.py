@@ -75,7 +75,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
         self.eaten_foods = []
         self.nearest_eaten_food = None
-
+        # --------------------------------------------
         self.opponents_index = self.getOpponents(gameState)
         self.distributions = [util.Counter() for i in range(4)]
 
@@ -83,6 +83,12 @@ class ReflexCaptureAgent(CaptureAgent):
         for col in range(self.layout_width):
             legalPosition[col] = [not x for x in legalPosition[col]]
         self.legalPosition = legalPosition.asList()
+        self.prePossiblePosition = [util.Counter() for i in range(4)]
+        for i in range(4):
+            for pos in self.legalPosition:
+                self.prePossiblePosition[i][pos] = 0
+        self.prePossiblePosition[0][(1, 2)] = 1
+        # --------------------------------------------
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.opponents_index]
@@ -179,35 +185,44 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def updateDistribution(self):
         if self.getPreviousObservation() is None:
-            return
+            return self.prePossiblePosition
         pre_distances = self.getPreviousObservation().getAgentDistances()
         pre_position = self.getPreviousObservation().getAgentPosition(self.index)
 
         cur_distances = self.getCurrentObservation().getAgentDistances()
         cur_position = self.getCurrentObservation().getAgentPosition(self.index)
 
-        cur_possible = []
-        pre_possible = []
         delta = (SONAR_NOISE_RANGE - 1) / 2
 
-        op_idx = self.opponents_index[0]
-        # ubound_t = cur_distances[op_idx] + delta
-        # lbound_t = cur_distances[op_idx] - delta
-        # ubound_t_prime = pre_distances[op_idx] + delta
-        # lbound_t_prime = pre_distances[op_idx] - delta
         for i in range(1):
             op_idx = self.opponents_index[i]
             for pos in self.legalPosition:
+                self.distributions[op_idx][pos] = 0
                 if cur_distances[op_idx] - delta <= \
-                        util.manhattanDistance(cur_position, pos) <= cur_distances[op_idx] + delta:
-                    cur_possible.append(pos)
-                if pre_distances[op_idx] - delta <= \
-                        util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta:
-                    pre_possible.append(pos)
+                        util.manhattanDistance(cur_position, pos) and util.manhattanDistance(pre_position, pos) <= \
+                        pre_distances[op_idx] + delta + 1:
+                    self.distributions[op_idx][pos] += 0.5
+                if pre_distances[op_idx] - delta - 1 <= \
+                        util.manhattanDistance(pre_position, pos) and util.manhattanDistance(cur_position, pos) <= \
+                        cur_distances[op_idx] + delta:
+                    self.distributions[op_idx][pos] += 0.5
 
-        self.distributions[op_idx][pos] = 1
-        else:
-        self.distributions[op_idx][pos] = 0
+            for pos in self.legalPosition:
+                if self.distributions[op_idx][pos] != 1:
+                    self.distributions[op_idx][pos] = 0
+
+            cur_possible = util.Counter()
+            for pos in self.prePossiblePosition[op_idx].keys():
+                if self.prePossiblePosition[op_idx][pos] == 1:
+                    cur_possible[pos] = 1
+                    for succ in self.GetSuccessors(pos):
+                        cur_possible[succ[0]] = 1
+
+            for pos in cur_possible.keys():
+                if self.distributions[op_idx][pos] == 0:
+                    cur_possible[pos] = 0
+            self.distributions[op_idx] = cur_possible.copy()
+            self.prePossiblePosition[op_idx] = cur_possible.copy()
 
 
 class Positive(ReflexCaptureAgent):
