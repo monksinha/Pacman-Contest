@@ -41,6 +41,7 @@ class ReflexCaptureAgent(CaptureAgent):
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
             = self.opponents_index = self.distributions = None
         self.opt_reborn_poss = {}
+        self.opt_init_pos = {}
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -59,7 +60,7 @@ class ReflexCaptureAgent(CaptureAgent):
         # self.Log(gameState)
 
         CaptureAgent.registerInitialState(self, gameState)
-        self.start_position = gameState.getAgentState(self.index).getPosition()
+        self.start_position = gameState.getInitialAgentPosition(self.index)
         self.opponent_food_list = self.getFood(gameState).asList()
         self.food_list = self.getFoodYouAreDefending(gameState).asList()
         self.walls = gameState.getWalls().asList()
@@ -78,12 +79,8 @@ class ReflexCaptureAgent(CaptureAgent):
         self.nearest_eaten_food = None
         # --------------------------------------------
         self.opponents_index = self.getOpponents(gameState)
-        self.opt_init_pos = {}
-        # TODO check
-        self.opt_init_pos[self.opponents_index[0]] = p1 = (
-            self.layout_width - 1 - self.start_position[0], self.layout_height - 1 - self.start_position[1])
-        self.opt_init_pos[self.opponents_index[1]] = p2 = (
-            self.layout_width - 1 - self.start_position[0], self.layout_height - self.start_position[1])
+        self.opt_init_pos[self.opponents_index[0]] = p1 = gameState.getInitialAgentPosition(self.opponents_index[0])
+        self.opt_init_pos[self.opponents_index[1]] = p2 = gameState.getInitialAgentPosition(self.opponents_index[1])
 
         self.opt_reborn_poss[self.opponents_index[0]] = [pos for pos, _ in self.GetSuccessors(p1)]
         self.opt_reborn_poss[self.opponents_index[1]] = [pos for pos, _ in self.GetSuccessors(p2)]
@@ -93,15 +90,18 @@ class ReflexCaptureAgent(CaptureAgent):
         for col in range(self.layout_width):
             legalPosition[col] = [not x for x in legalPosition[col]]
         self.legalPosition = legalPosition.asList()
+        # init start position possibility
         self.prePossiblePosition = [util.Counter() for i in range(4)]
-        for i in range(4):
-            for pos in self.legalPosition:
-                self.prePossiblePosition[i][pos] = 0
-        for pos, _ in self.GetSuccessors(self.opt_init_pos[self.opponents_index[0]]):
-            self.prePossiblePosition[self.opponents_index[0]][pos] = 1
-        for pos, _ in self.GetSuccessors(self.opt_init_pos[self.opponents_index[1]]):
-            self.prePossiblePosition[self.opponents_index[1]][pos] = 1
-            # --------------------------------------------
+        for idx in self.opponents_index:
+            self.initStartPositionPossibility(idx)
+
+        # --------------------------------------------
+
+    def initStartPositionPossibility(self, index):
+        self.prePossiblePosition[index] = util.Counter()
+        self.prePossiblePosition[index][self.opt_init_pos[index]] = 1
+        for pos, _ in self.GetSuccessors(self.opt_init_pos[index]):
+            self.prePossiblePosition[index][pos] = 1
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.opponents_index]
@@ -199,28 +199,31 @@ class ReflexCaptureAgent(CaptureAgent):
     def updateDistribution(self):
         if self.getPreviousObservation() is None:
             return self.prePossiblePosition
+
         pre_distances = self.getPreviousObservation().getAgentDistances()
         pre_position = self.getPreviousObservation().getAgentPosition(self.index)
-
         cur_distances = self.getCurrentObservation().getAgentDistances()
         cur_position = self.getCurrentObservation().getAgentPosition(self.index)
-
         delta = (SONAR_NOISE_RANGE - 1) / 2
 
         for i in range(2):
             op_idx = self.opponents_index[i]
+            op_position = self.getCurrentObservation().getAgentPosition(op_idx)
+            if op_position is not None:
+                self.distributions[op_idx] = util.Counter()
+                self.prePossiblePosition[op_idx] = util.Counter()
+                self.distributions[op_idx][op_position] = 1
+                self.prePossiblePosition[op_idx][op_position] = 1
+                if op_position == cur_position:
+                    self.initStartPositionPossibility(op_idx)
+                    self.distributions[op_idx] = self.prePossiblePosition.copy()
+                continue
             for pos in self.legalPosition:
                 self.distributions[op_idx][pos] = 0
                 if cur_distances[op_idx] - delta <= util.manhattanDistance(cur_position, pos) \
-                        and util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 1:
-                    self.distributions[op_idx][pos] += 0.5
-                if pre_distances[op_idx] - delta - 1 <= util.manhattanDistance(pre_position, pos) \
-                        and util.manhattanDistance(cur_position, pos) <= cur_distances[op_idx] + delta:
-                    self.distributions[op_idx][pos] += 0.5
-
-            for pos in self.legalPosition:
-                if self.distributions[op_idx][pos] != 1:
-                    self.distributions[op_idx][pos] = 0
+                        <= cur_distances[op_idx] + delta and pre_distances[op_idx] - delta - 1 <= \
+                        util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 1:
+                    self.distributions[op_idx][pos] = 1
 
             cur_possible = util.Counter()
             for pos in self.prePossiblePosition[op_idx].keys():
@@ -245,6 +248,7 @@ class ReflexCaptureAgent(CaptureAgent):
                 for rebornPos in self.opt_reborn_poss[op_idx]:
                     self.prePossiblePosition[op_idx][rebornPos] = 1
                     self.distributions[op_idx][rebornPos] = 1
+        return self.distributions
 
 
 class Positive(ReflexCaptureAgent):
@@ -258,8 +262,7 @@ class Positive(ReflexCaptureAgent):
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
-        self.updateDistribution()
-        self.displayDistributionsOverPositions(self.distributions)
+        self.displayDistributionsOverPositions(self.updateDistribution())
 
         if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(
                 self.index).scaredTimer == 0:
@@ -328,6 +331,7 @@ class Negative(ReflexCaptureAgent):
             return False
 
     def chooseAction(self, gameState):
+        # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
         current_position = current_state.getPosition()
         mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
