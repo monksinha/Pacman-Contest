@@ -40,6 +40,7 @@ class ReflexCaptureAgent(CaptureAgent):
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
             = self.opponents_index = self.distributions = None
+        self.opt_reborn_poss = {}
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -77,6 +78,15 @@ class ReflexCaptureAgent(CaptureAgent):
         self.nearest_eaten_food = None
         # --------------------------------------------
         self.opponents_index = self.getOpponents(gameState)
+        self.opt_init_pos = {}
+        # TODO check
+        self.opt_init_pos[self.opponents_index[0]] = p1 = (
+            self.layout_width - 1 - self.start_position[0], self.layout_height - 1 - self.start_position[1])
+        self.opt_init_pos[self.opponents_index[1]] = p2 = (
+            self.layout_width - 1 - self.start_position[0], self.layout_height - self.start_position[1])
+
+        self.opt_reborn_poss[self.opponents_index[0]] = [pos for pos, _ in self.GetSuccessors(p1)]
+        self.opt_reborn_poss[self.opponents_index[1]] = [pos for pos, _ in self.GetSuccessors(p2)]
         self.distributions = [util.Counter() for i in range(4)]
 
         legalPosition = gameState.getWalls().deepCopy()
@@ -87,8 +97,11 @@ class ReflexCaptureAgent(CaptureAgent):
         for i in range(4):
             for pos in self.legalPosition:
                 self.prePossiblePosition[i][pos] = 0
-        self.prePossiblePosition[0][(1, 2)] = 1
-        # --------------------------------------------
+        for pos, _ in self.GetSuccessors(self.opt_init_pos[self.opponents_index[0]]):
+            self.prePossiblePosition[self.opponents_index[0]][pos] = 1
+        for pos, _ in self.GetSuccessors(self.opt_init_pos[self.opponents_index[1]]):
+            self.prePossiblePosition[self.opponents_index[1]][pos] = 1
+            # --------------------------------------------
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.opponents_index]
@@ -194,17 +207,15 @@ class ReflexCaptureAgent(CaptureAgent):
 
         delta = (SONAR_NOISE_RANGE - 1) / 2
 
-        for i in range(1):
+        for i in range(2):
             op_idx = self.opponents_index[i]
             for pos in self.legalPosition:
                 self.distributions[op_idx][pos] = 0
-                if cur_distances[op_idx] - delta <= \
-                        util.manhattanDistance(cur_position, pos) and util.manhattanDistance(pre_position, pos) <= \
-                        pre_distances[op_idx] + delta + 1:
+                if cur_distances[op_idx] - delta <= util.manhattanDistance(cur_position, pos) \
+                        and util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 1:
                     self.distributions[op_idx][pos] += 0.5
-                if pre_distances[op_idx] - delta - 1 <= \
-                        util.manhattanDistance(pre_position, pos) and util.manhattanDistance(cur_position, pos) <= \
-                        cur_distances[op_idx] + delta:
+                if pre_distances[op_idx] - delta - 1 <= util.manhattanDistance(pre_position, pos) \
+                        and util.manhattanDistance(cur_position, pos) <= cur_distances[op_idx] + delta:
                     self.distributions[op_idx][pos] += 0.5
 
             for pos in self.legalPosition:
@@ -217,12 +228,23 @@ class ReflexCaptureAgent(CaptureAgent):
                     cur_possible[pos] = 1
                     for succ in self.GetSuccessors(pos):
                         cur_possible[succ[0]] = 1
-
+            isSeen = False
             for pos in cur_possible.keys():
                 if self.distributions[op_idx][pos] == 0:
                     cur_possible[pos] = 0
-            self.distributions[op_idx] = cur_possible.copy()
-            self.prePossiblePosition[op_idx] = cur_possible.copy()
+                elif cur_possible[pos] != 0:
+                    isSeen = True
+            if isSeen:
+                self.distributions[op_idx] = util.Counter()
+                self.prePossiblePosition[op_idx] = util.Counter()
+                self.distributions[op_idx] = cur_possible.copy()
+                self.prePossiblePosition[op_idx] = cur_possible.copy()
+            else:
+                self.distributions[op_idx] = util.Counter()
+                self.prePossiblePosition[op_idx] = util.Counter()
+                for rebornPos in self.opt_reborn_poss[op_idx]:
+                    self.prePossiblePosition[op_idx][rebornPos] = 1
+                    self.distributions[op_idx][rebornPos] = 1
 
 
 class Positive(ReflexCaptureAgent):
