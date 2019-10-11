@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
+def createTeam(firstIndex, secondIndex, isRed, first='negative', second='Friendly'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -262,7 +262,7 @@ class Positive(ReflexCaptureAgent):
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
-        self.displayDistributionsOverPositions(self.updateDistribution())
+        # self.displayDistributionsOverPositions(self.updateDistribution())
 
         if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(
                 self.index).scaredTimer == 0:
@@ -365,3 +365,133 @@ class Negative(ReflexCaptureAgent):
             return self.waStarSearch(self.nearest_eaten_food, self.DetectOpponentGhostsHeuristic)
 
         return self.waStarSearch(nearest_mid_point, self.nullHeuristic)
+
+
+class Friendly(ReflexCaptureAgent):
+    def __init__(self, gameState):
+        ReflexCaptureAgent.__init__(self, gameState)
+        self.mTerritory = {}
+        self.invincible_state = (False, 0)
+
+    def registerInitialState(self, gameState):
+        ReflexCaptureAgent.registerInitialState(self, gameState)
+        self.territory()
+
+    def territory(self):
+        x0, _ = self.start_position
+        for pos in self.legalPosition:
+            x, _ = pos
+            # TODO check self.layout_width // 2
+            if abs(x - x0) < self.layout_width // 2 - 1:
+                self.mTerritory[pos] = True
+            else:
+                self.mTerritory[pos] = False
+
+    def isInvade(self, op_idx):
+        count = 0
+        for pos in self.distributions[op_idx].keys():
+            if self.distributions[op_idx][pos] != 0:
+                if self.mTerritory[pos]:
+                    count += 1
+                else:
+                    count -= 1
+        return True if count > 0 else False
+
+    def chooseAction(self, gameState):
+        current_position = gameState.getAgentState(self.index).getPosition()
+        mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
+        nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
+        nearest_capsule = self.GetNearestCapsule(gameState)
+        nearest_food = self.GetNearestFood(gameState)
+        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
+
+        self.displayDistributionsOverPositions(self.updateDistribution())
+
+        print(self.isInvade(self.opponents_index[0]))
+
+        def evalution():
+            nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+            if nearby_ghosts:
+                isInv, leftTime = self.invincible_state
+                d = []
+                chase = []
+                for g in nearby_ghosts:
+                    dis = self.getMazeDistance(current_position, g.getPosition())
+                    d.append(dis)
+                    if isInv and leftTime > dis:
+                        chase.append((g.getPosition(), dis))
+
+                if chase != []:
+                    def takeSecond(elem):
+                        return elem[1]
+
+                    chase.sort(key=takeSecond)
+                    return 'chase', chase[0]
+                else:
+                    if min(d) >= 8:
+                        return 'eat_more', nearest_food
+                    if 5 < min(d) < 8:
+                        return 'sneak', certainFood()
+                return 'escape', nearestExit()
+
+            if min(eval_dist()) >= 8:
+                return 'eat_more', nearest_food
+            if 5 <= min(eval_dist()) < 8:
+                return 'sneak', certainFood()
+
+            return 'eat_more', nearest_food
+
+        def eval_dist():
+            dists = []
+            cur_position = self.getCurrentObservation().getAgentState(self.index).getPosition()
+
+            def nPP(idx):
+                curMin = 9999
+                distribution = self.distributions[idx]
+                for pos in distribution.keys():
+                    if distribution[pos] != 0:
+                        curMin = min(self.getMazeDistance(cur_position, pos), curMin)
+                return curMin
+
+            for i in self.opponents_index:
+                dists.append(nPP(i))
+            return dists
+
+        def nearestExit():
+            return nearest_mid_point
+
+        def certainFood():
+            return nearest_food
+
+
+
+        strategy, goal = evalution()
+        if strategy == 'eat_more':
+            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
+        if strategy == 'escape':
+            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
+        if strategy == 'sneak':
+            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
+        if strategy == 'chase':
+            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
+
+
+        #
+        # if nearby_ghosts:
+        #     for ghost in nearby_ghosts:
+        #         if ghost.scaredTimer > 0:
+        #             return self.waStarSearch(ghost.getPosition(), self.DetectOpponentGhostsHeuristic)
+        #     if nearest_capsule:
+        #         return self.waStarSearch(nearest_capsule, self.DetectOpponentGhostsHeuristic)
+        #     else:
+        #         return self.waStarSearch(nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+        #
+        # if gameState.getAgentState(self.index).numCarrying >= MIN_CARRYING:
+        #     return self.waStarSearch(nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+        #
+        # return self.waStarSearch(nearest_food, self.DetectOpponentGhostsHeuristic)
+        #
+        #
+
+
