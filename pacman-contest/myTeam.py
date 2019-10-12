@@ -34,19 +34,20 @@ def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendl
 ##########
 
 class ReflexCaptureAgent(CaptureAgent):
-    instances = [None, None]
 
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
-        self.index = index
-        self.teammate_index = 2 if index == 0 else 0 if index == 2 else 1 if index == 3 else 3
+        self.teammate_idx = None
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
             = self.opponents_index = self.distributions = None
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
-        self.instances[index // 2] = self
+
+        self._instances = {}
+        self._instances[index] = self
+
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -63,7 +64,11 @@ class ReflexCaptureAgent(CaptureAgent):
     def registerInitialState(self, gameState):
         self.InitLogger()
         # self.Log(gameState)
-        self.teammate = self.instances[(self.index // 2 + 1) % 2]
+        if self.index == self.getTeam(gameState)[0]:
+            self.teammate_idx =self.getTeam(gameState)[1]
+        else:
+            self.teammate_idx =self.getTeam(gameState)[0]
+        self.teammate = self._instances[self.teammate_idx]
 
         CaptureAgent.registerInitialState(self, gameState)
         self.start_position = gameState.getInitialAgentPosition(self.index)
@@ -222,7 +227,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
         for i in range(2):
             op_idx = self.opponents_index[i]
-            op_position = self.getCurrentObservation().getAgentPosition(op_idx)
+            op_position = self._instances[self.index].getCurrentObservation().getAgentPosition(op_idx)
             if op_position is not None:
                 self.distributions[op_idx] = util.Counter()
                 self.prePossiblePosition[op_idx] = util.Counter()
@@ -319,7 +324,7 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
-        teammate_state = gameState.getAgentState(self.teammate_index)
+        teammate_state = gameState.getAgentState(self.teammate_idx)
         self.Log(teammate_state)
         # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
