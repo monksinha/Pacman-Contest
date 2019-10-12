@@ -323,7 +323,7 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
-        self.Log(teammate_state)
+        # self.Log(teammate_state)
         self.Log(self.teammate)
 
         teammate_state = gameState.getAgentState(self.teammate_index)
