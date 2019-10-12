@@ -303,37 +303,6 @@ class Negative(ReflexCaptureAgent):
                 if self.nearest_eaten_food != None:
                     self.eaten_foods.append(self.nearest_eaten_food)
 
-    def IsOpponentEating(self):
-        current_foods = self.getFoodYouAreDefending(self.getCurrentObservation()).asList()
-        return len(current_foods) < len(self.food_list)
-
-    def IsEating(self):
-        if self.getPreviousObservation() is not None and len(
-                self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < len(
-            self.getFoodYouAreDefending(self.getPreviousObservation()).asList()):
-            return True
-        else:
-            return False
-
-    # get the closest food eaten
-    def getEaten(self):
-        defendLeft = self.getFoodYouAreDefending(self.getCurrentObservation()).asList()
-        lastDefend = self.getFoodYouAreDefending(self.getPreviousObservation()).asList()
-        eaten = [left for left in lastDefend if left not in defendLeft]
-        # self.Log(eaten)
-        eatenDis = [self.getMazeDistance(self.getCurrentObservation().getAgentState(self.index).getPosition(), eat) for
-                    eat in eaten]
-        closeEaten = [e for e, d in zip(eaten, eatenDis) if d == min(eatenDis)]
-        self.eaten_foods = closeEaten[0]
-        return closeEaten[0]
-
-    # check if any food has been eaten
-    def beginEaten(self):
-        if len(self.getFoodYouAreDefending(self.getCurrentObservation()).asList()) < len(self.food_list):
-            return True
-        else:
-            return False
-
     def chooseAction(self, gameState):
         # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
@@ -412,7 +381,7 @@ class Friendly(ReflexCaptureAgent):
 
         self.displayDistributionsOverPositions(self.updateDistribution())
 
-        print(self.isInvade(self.opponents_index[0]))
+        # print(self.isInvade(self.opponents_index[0]))
 
         def evalution():
             nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
