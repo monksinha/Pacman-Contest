@@ -37,10 +37,13 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
-<<<<<<< HEAD
+
         self.teammate_idx = None
-=======
+
         self.index = index
+
+>>>>>>> parent of 796fa26... teammate_index
+
 >>>>>>> parent of 796fa26... teammate_index
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
@@ -328,9 +331,13 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
-<<<<<<< HEAD
+
+
         teammate_state = gameState.getAgentState(self.teammate_idx)
         self.Log(teammate_state)
+
+        self.Log(self.teammate)
+>>>>>>> parent of 796fa26... teammate_index
 =======
         self.Log(self.teammate)
 >>>>>>> parent of 796fa26... teammate_index
