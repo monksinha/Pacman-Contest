@@ -34,10 +34,10 @@ def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendl
 ##########
 
 class ReflexCaptureAgent(CaptureAgent):
-
+    _instances = [None, None]
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
-        self.teammate_idx = None
+        self.teammate_index = 2 if index == 0 else 0 if index == 2 else 1 if index == 3 else 3
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
@@ -45,9 +45,7 @@ class ReflexCaptureAgent(CaptureAgent):
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
 
-        self._instances = {}
-        self._instances[index] = self
-
+        self._instances.append(self)
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -64,11 +62,11 @@ class ReflexCaptureAgent(CaptureAgent):
     def registerInitialState(self, gameState):
         self.InitLogger()
         # self.Log(gameState)
-        if self.index == self.getTeam(gameState)[0]:
-            self.teammate_idx =self.getTeam(gameState)[1]
-        else:
-            self.teammate_idx =self.getTeam(gameState)[0]
-        self.teammate = self._instances[self.teammate_idx]
+        # if self.index == self.getTeam(gameState)[0]:
+        #     self.teammate_idx =self.getTeam(gameState)[1]
+        # else:
+        #     self.teammate_idx =self.getTeam(gameState)[0]
+        self.teammate = self._instances[self.teammate_index//2]
 
         CaptureAgent.registerInitialState(self, gameState)
         self.start_position = gameState.getInitialAgentPosition(self.index)
@@ -324,8 +322,8 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
-        teammate_state = gameState.getAgentState(self.teammate_idx)
-        self.Log(teammate_state)
+        teammate_state = gameState.getAgentState(self.teammate_index)
+        # self.Log(teammate_state)
         # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
         current_position = current_state.getPosition()
