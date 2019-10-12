@@ -34,14 +34,18 @@ def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendl
 ##########
 
 class ReflexCaptureAgent(CaptureAgent):
+    instances = [None, None]
+
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
+        self.index = index
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
             = self.opponents_index = self.distributions = None
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
+        self.instances[index // 2] = self
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -58,6 +62,7 @@ class ReflexCaptureAgent(CaptureAgent):
     def registerInitialState(self, gameState):
         self.InitLogger()
         # self.Log(gameState)
+        self.teammate = self.instances[(self.index // 2 + 1) % 2]
 
         CaptureAgent.registerInitialState(self, gameState)
         self.start_position = gameState.getInitialAgentPosition(self.index)
@@ -266,6 +271,7 @@ class ReflexCaptureAgent(CaptureAgent):
 class Positive(ReflexCaptureAgent):
 
     def chooseAction(self, gameState):
+        self.Log(self.teammate)
         current_position = gameState.getAgentState(self.index).getPosition()
         mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
         nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
@@ -312,6 +318,7 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
+        self.Log(self.teammate)
         # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
         current_position = current_state.getPosition()
