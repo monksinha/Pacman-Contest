@@ -42,6 +42,8 @@ class ReflexCaptureAgent(CaptureAgent):
             = self.opponents_index = self.distributions = None
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
+        self._instances = {}
+        self._instances[index] = self
 
     def InitLogger(self):
         self.logger = logging.getLogger()
@@ -216,7 +218,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
         for i in range(2):
             op_idx = self.opponents_index[i]
-            op_position = self.getCurrentObservation().getAgentPosition(op_idx)
+            op_position = self._instances[self.index].getCurrentObservation().getAgentPosition(op_idx)
             if op_position is not None:
                 self.distributions[op_idx] = util.Counter()
                 self.prePossiblePosition[op_idx] = util.Counter()
