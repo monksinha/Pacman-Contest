@@ -35,13 +35,16 @@ def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendl
 
 class ReflexCaptureAgent(CaptureAgent):
     _instances = []
+    distributions= [util.Counter() for i in range(4)]
+    prePossiblePosition = [util.Counter() for i in range(4)]
+
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
         self.teammate_index = 2 if index == 0 else 0 if index == 2 else 1 if index == 3 else 3
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
-            = self.opponents_index = self.distributions = None
+            = self.opponents_index = None
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
 
@@ -66,7 +69,7 @@ class ReflexCaptureAgent(CaptureAgent):
         #     self.teammate_idx =self.getTeam(gameState)[1]
         # else:
         #     self.teammate_idx =self.getTeam(gameState)[0]
-        self.teammate = self._instances[self.teammate_index//2]
+        self.teammate = self._instances[self.teammate_index // 2]
 
         CaptureAgent.registerInitialState(self, gameState)
         self.start_position = gameState.getInitialAgentPosition(self.index)
@@ -100,7 +103,7 @@ class ReflexCaptureAgent(CaptureAgent):
             legalPosition[col] = [not x for x in legalPosition[col]]
         self.legalPosition = legalPosition.asList()
         # init start position possibility
-        self.prePossiblePosition = [util.Counter() for i in range(4)]
+        # self.prePossiblePosition = [util.Counter() for i in range(4)]
         for idx in self.opponents_index:
             self.initStartPositionPossibility(idx)
 
@@ -111,6 +114,10 @@ class ReflexCaptureAgent(CaptureAgent):
         self.prePossiblePosition[index][self.opt_init_pos[index]] = 1
         for pos, _ in self.GetSuccessors(self.opt_init_pos[index]):
             self.prePossiblePosition[index][pos] = 1
+        # for pos in self.prePossiblePosition[index].keys():
+        #     if self.prePossiblePosition[index][pos] == 1:
+        #         for p, _ in self.GetSuccessors(self.opt_init_pos[index]):
+        #             self.prePossiblePosition[index][p] = 1
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.opponents_index]
@@ -214,18 +221,29 @@ class ReflexCaptureAgent(CaptureAgent):
         return 'Stop'
 
     def updateDistribution(self):
-        if self.getPreviousObservation() is None:
+        if self.getPreviousObservation() is None:  # or self.teammate.getPreviousObservation() is None:
             return self.prePossiblePosition
+        my_cur_gs = self.getCurrentObservation()
+        my_pre_gs = self.getPreviousObservation() if self.getPreviousObservation() is not None else my_cur_gs
+        tm_cur_gs = self.teammate.getCurrentObservation() if self.teammate.getCurrentObservation() is not None else my_cur_gs
+        tm_pre_gs = self.teammate.getPreviousObservation() if self.teammate.getPreviousObservation() is not None else tm_cur_gs
+        pre_distances = my_pre_gs.getAgentDistances()
+        pre_position = my_pre_gs.getAgentPosition(self.index)
+        cur_distances = my_cur_gs.getAgentDistances()
+        cur_position = my_cur_gs.getAgentPosition(self.index)
 
-        pre_distances = self.getPreviousObservation().getAgentDistances()
-        pre_position = self.getPreviousObservation().getAgentPosition(self.index)
-        cur_distances = self.getCurrentObservation().getAgentDistances()
-        cur_position = self.getCurrentObservation().getAgentPosition(self.index)
+        pre_distances1 = tm_pre_gs.getAgentDistances()
+        pre_position1 = tm_pre_gs.getAgentPosition(self.teammate_index)
+        cur_distances1 = tm_cur_gs.getAgentDistances()
+        cur_position1 = tm_cur_gs.getAgentPosition(self.teammate_index)
+
         delta = (SONAR_NOISE_RANGE - 1) / 2
 
-        for i in range(2):
-            op_idx = self.opponents_index[i]
-            op_position = self._instances[self.index//2].getCurrentObservation().getAgentPosition(op_idx)
+        pre_op_idx = (4 + self.index - 1) % 4
+        next_op_idx = (4 + self.index + 1) % 4
+        for op_idx in [pre_op_idx, next_op_idx]:
+            # op_idx = self.opponents_index[i]
+            op_position = my_cur_gs.getAgentPosition(op_idx)
             if op_position is not None:
                 self.distributions[op_idx] = util.Counter()
                 self.prePossiblePosition[op_idx] = util.Counter()
@@ -235,12 +253,25 @@ class ReflexCaptureAgent(CaptureAgent):
                     self.initStartPositionPossibility(op_idx)
                     self.distributions[op_idx] = self.prePossiblePosition.copy()
                 continue
+
             for pos in self.legalPosition:
                 self.distributions[op_idx][pos] = 0
-                if cur_distances[op_idx] - delta <= util.manhattanDistance(cur_position, pos) \
-                        <= cur_distances[op_idx] + delta and pre_distances[op_idx] - delta - 1 <= \
-                        util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 1:
-                    self.distributions[op_idx][pos] = 1
+                if op_idx == pre_op_idx:
+                    if cur_distances[op_idx] - delta <= util.manhattanDistance(cur_position, pos) \
+                            <= cur_distances[op_idx] + delta and pre_distances[op_idx] - delta - 1 <= \
+                            util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 1 \
+                            and cur_distances1[op_idx] - delta - 1 <= util.manhattanDistance(cur_position1, pos) \
+                            <= cur_distances1[op_idx] + delta + 1 and pre_distances1[op_idx] - delta - 2 <= \
+                            util.manhattanDistance(pre_position1, pos) <= pre_distances1[op_idx] + delta + 2:
+                        self.distributions[op_idx][pos] = 1
+                else:
+                    if cur_distances[op_idx] - delta - 1 <= util.manhattanDistance(cur_position, pos) \
+                            <= cur_distances[op_idx] + delta + 1 and pre_distances[op_idx] - delta - 2 <= \
+                            util.manhattanDistance(pre_position, pos) <= pre_distances[op_idx] + delta + 2 \
+                            and cur_distances1[op_idx] - delta <= util.manhattanDistance(cur_position1, pos) \
+                            <= cur_distances1[op_idx] + delta and pre_distances1[op_idx] - delta - 1 <= \
+                            util.manhattanDistance(pre_position1, pos) <= pre_distances1[op_idx] + delta + 1:
+                        self.distributions[op_idx][pos] = 1
 
             cur_possible = util.Counter()
             for pos in self.prePossiblePosition[op_idx].keys():
@@ -250,6 +281,8 @@ class ReflexCaptureAgent(CaptureAgent):
                         cur_possible[succ[0]] = 1
             for pos in cur_possible.keys():
                 if util.manhattanDistance(pos, cur_position) <= 5:
+                    cur_possible[pos] = 0
+                if util.manhattanDistance(pos, cur_position1) <= 5:
                     cur_possible[pos] = 0
 
             isSeen = False
@@ -284,7 +317,7 @@ class Positive(ReflexCaptureAgent):
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
 
-        # self.displayDistributionsOverPositions(self.updateDistribution())
+        self.displayDistributionsOverPositions(self.updateDistribution())
 
         if not gameState.getAgentState(self.index).isPacman and nearby_pacmans and gameState.getAgentState(
                 self.index).scaredTimer == 0:
@@ -324,7 +357,7 @@ class Negative(ReflexCaptureAgent):
     def chooseAction(self, gameState):
         teammate_state = gameState.getAgentState(self.teammate_index)
         # self.Log(teammate_state)
-        # self.displayDistributionsOverPositions(self.updateDistribution())
+        self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
         current_position = current_state.getPosition()
         mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
