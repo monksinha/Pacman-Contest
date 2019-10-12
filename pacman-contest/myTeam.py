@@ -15,7 +15,7 @@ from captureAgents import CaptureAgent
 import util, math
 from game import Directions, Actions
 from util import nearestPoint
-from capture import SONAR_NOISE_RANGE
+from capture import SONAR_NOISE_RANGE, SCARED_TIME
 import logging
 
 MIN_CARRYING = 2
@@ -156,11 +156,19 @@ class ReflexCaptureAgent(CaptureAgent):
     def nullHeuristic(self, gameState, thisPosition):
         return 0
 
-    def DetectOpponentGhostsHeuristic(self, gameState, thisPosition):
-        heuristics = [0]
-        ghosts = self.GetNearbyOpponentGhosts(gameState)
+    def manhattanHeuristic(self, pos, goal):
+        "The Manhattan distance heuristic for a PositionSearchProblem"
+        xy1 = pos
+        xy2 = goal
+        return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
+
+    def DetectOpponentGhostsHeuristic(self, thisPosition, goal):
+        heuristics = []
+        heuristics.append(self.manhattanHeuristic(thisPosition, goal))
+        ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
-            heuristics.append(999999 if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2 else 0)  # < 2
+            if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2:
+                heuristics.append(999999)
         return max(heuristics)
 
     class Node:
@@ -169,7 +177,7 @@ class ReflexCaptureAgent(CaptureAgent):
             self.path = path
             self.cost = cost
 
-    def waStarSearch(self, goalState, heuristic=nullHeuristic):
+    def waStarSearch(self, goal, heuristic=nullHeuristic):
         gameState = self.getCurrentObservation()
         start_position = gameState.getAgentState(self.index).getPosition()
         weight = 2
@@ -179,21 +187,21 @@ class ReflexCaptureAgent(CaptureAgent):
         while not heap.isEmpty():
             node = heap.pop()
             states = node.states
-            state = states[-1]
+            pos = states[-1]
             path = node.path
             cost = node.cost
-            if state == goalState:
+            if pos == goal:
                 return path[0] if path else 'Stop'
-            for successor in self.GetSuccessors(state):
+            for successor in self.GetSuccessors(pos):
                 successor_state = successor[0]
                 successor_direction = successor[1]
-                successor_cost = cost + heuristic(gameState, successor_state)
+                successor_cost = cost + heuristic(successor_state, goal)
                 if successor_state not in visited or visited[successor_state] > successor_cost:
                     visited[successor_state] = successor_cost
                     successor_states = states + [successor_state]
                     successor_path = path + [successor_direction]
                     heap.push(self.Node(successor_states, successor_path, successor_cost),
-                              successor_cost + weight * heuristic(gameState, successor_state))
+                              successor_cost + weight * heuristic(successor_state, goal))
         return 'Stop'
 
     def updateDistribution(self):
@@ -330,7 +338,7 @@ class Negative(ReflexCaptureAgent):
                     if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
                         return self.waStarSearch(self.start_position, self.DetectOpponentGhostsHeuristic)
             if nearby_pacmans is not None:
-                return self.waStarSearch(nearby_pacmans, self.DetectOpponentGhostsHeuristic)
+                return self.waStarSearch(nearby_pacmans[0].getPosition(), self.DetectOpponentGhostsHeuristic)
             return self.waStarSearch(nearest_mid_point, self.nullHeuristic)
 
         # self.Log(self.nearest_eaten_food)
@@ -378,6 +386,8 @@ class Friendly(ReflexCaptureAgent):
         nearest_food = self.GetNearestFood(gameState)
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
         nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
+        capsules = self.getCapsules(self.getPreviousObservation() if self.getPreviousObservation() else gameState)
+        carry_points = self.getCurrentObservation().getAgentState(self.index).numCarrying
 
         self.displayDistributionsOverPositions(self.updateDistribution())
 
@@ -385,6 +395,8 @@ class Friendly(ReflexCaptureAgent):
 
         def evalution():
             nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+            if carry_points > 5:
+                return 'escape', nearest_mid_point
             if nearby_ghosts:
                 isInv, leftTime = self.invincible_state
                 d = []
@@ -397,15 +409,13 @@ class Friendly(ReflexCaptureAgent):
 
                 if chase != []:
                     chase.sort(key=lambda x: x[1])
-                    return 'chase', chase[0]
+                    return 'chase', chase[0][0]
                 else:
                     if min(d) >= 8:
                         return 'eat_more', nearest_food
                     if 5 < min(d) < 8:
                         return 'sneak', certainFood()
                 return 'escape', nearest_mid_point
-
-
 
             if min(eval_dist()) >= 8:
                 return 'eat_more', nearest_food
@@ -458,7 +468,20 @@ class Friendly(ReflexCaptureAgent):
                     accessible_food.append(f)
             return accessible_food
 
+        def update_Invincible():
+            isInvincible, leftTime = self.invincible_state
+            if current_position in capsules:
+                self.invincible_state = (True, SCARED_TIME)
+            elif isInvincible:
+                if leftTime - 1 > 0:
+                    self.invincible_state = (True, leftTime - 1)
+                else:
+                    self.invincible_state = (False, 0)
+
         strategy, goal = evalution()
+        update_Invincible()
+        print(self.invincible_state)
+
         if strategy == 'eat_more':
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
         if strategy == 'escape':
@@ -466,7 +489,7 @@ class Friendly(ReflexCaptureAgent):
         if strategy == 'sneak':
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
         if strategy == 'chase':
-            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
+            return self.waStarSearch(goal, self.manhattanHeuristic)
 
         #
         # if nearby_ghosts:
