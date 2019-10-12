@@ -39,6 +39,7 @@ class ReflexCaptureAgent(CaptureAgent):
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
         self.index = index
+        self.teammate_index = 2 if index == 0 else 0 if index == 2 else 1 if index == 3 else 3
         self.display = 'updateDistributions'
         self.start_position = self.opponent_food_list = self.food_list = self.walls = self.layout_height \
             = self.layout_width = self.mid_points = self.eaten_foods = self.logger = self.nearest_eaten_food \
@@ -318,7 +319,8 @@ class Negative(ReflexCaptureAgent):
                     self.eaten_foods.append(self.nearest_eaten_food)
 
     def chooseAction(self, gameState):
-        self.Log(self.teammate)
+        teammate_state = gameState.getAgentState(self.teammate_index)
+        self.Log(teammate_state)
         # self.displayDistributionsOverPositions(self.updateDistribution())
         current_state = gameState.getAgentState(self.index)
         current_position = current_state.getPosition()
