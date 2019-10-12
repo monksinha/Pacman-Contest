@@ -34,7 +34,7 @@ def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendl
 ##########
 
 class ReflexCaptureAgent(CaptureAgent):
-    _instances = [None, None]
+    _instances = []
     def __init__(self, index, timeForComputing=.1):
         CaptureAgent.__init__(self, index, timeForComputing)
         self.teammate_index = 2 if index == 0 else 0 if index == 2 else 1 if index == 3 else 3
@@ -225,7 +225,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
         for i in range(2):
             op_idx = self.opponents_index[i]
-            op_position = self._instances[self.index].getCurrentObservation().getAgentPosition(op_idx)
+            op_position = self._instances[self.index//2].getCurrentObservation().getAgentPosition(op_idx)
             if op_position is not None:
                 self.distributions[op_idx] = util.Counter()
                 self.prePossiblePosition[op_idx] = util.Counter()
