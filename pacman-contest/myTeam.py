@@ -94,8 +94,8 @@ class ReflexCaptureAgent(CaptureAgent):
         self.opt_init_pos[self.opponents_index[0]] = p1 = gameState.getInitialAgentPosition(self.opponents_index[0])
         self.opt_init_pos[self.opponents_index[1]] = p2 = gameState.getInitialAgentPosition(self.opponents_index[1])
 
-        self.opt_reborn_poss[self.opponents_index[0]] = [pos for pos, _ in self.GetSuccessors(p1)].append(p1)
-        self.opt_reborn_poss[self.opponents_index[1]] = [pos for pos, _ in self.GetSuccessors(p2)].append(p2)
+        self.opt_reborn_poss[self.opponents_index[0]] = [pos for pos, _ in self.GetSuccessors(p1)] + [p1]
+        self.opt_reborn_poss[self.opponents_index[1]] = [pos for pos, _ in self.GetSuccessors(p2)] + [p2]
         self.distributions = [util.Counter() for i in range(4)]
 
         legalPosition = gameState.getWalls().deepCopy()
@@ -273,8 +273,8 @@ class ReflexCaptureAgent(CaptureAgent):
                 if self.prePossiblePosition[op_idx][pos] == 1:
                     cur_possible[pos] = 1
                     if op_idx == pre_op_idx:
-                        for succ in self.GetSuccessors(pos):
-                            cur_possible[succ[0]] = 1
+                        for p, _ in self.GetSuccessors(pos):
+                            cur_possible[p] = 1
             for pos in cur_possible.keys():
                 if util.manhattanDistance(pos, cur_position) <= 5:
                     cur_possible[pos] = 0
@@ -298,6 +298,9 @@ class ReflexCaptureAgent(CaptureAgent):
                 for rebornPos in self.opt_reborn_poss[op_idx]:
                     self.prePossiblePosition[op_idx][rebornPos] = 1
                     self.distributions[op_idx][rebornPos] = 1
+                    for p, _ in self.GetSuccessors(rebornPos):
+                        self.prePossiblePosition[op_idx][p] = 1
+                        self.distributions[op_idx][p] = 1
         return self.distributions
 
 
