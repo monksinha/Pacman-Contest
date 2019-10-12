@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='negative', second='Friendly'):
+def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendly'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -231,6 +231,10 @@ class ReflexCaptureAgent(CaptureAgent):
                     cur_possible[pos] = 1
                     for succ in self.GetSuccessors(pos):
                         cur_possible[succ[0]] = 1
+            for pos in cur_possible.keys():
+                if util.manhattanDistance(pos, cur_position) <= 5:
+                    cur_possible[pos] = 0
+
             isSeen = False
             for pos in cur_possible.keys():
                 if self.distributions[op_idx][pos] == 0:
@@ -423,17 +427,16 @@ class Friendly(ReflexCaptureAgent):
                         chase.append((g.getPosition(), dis))
 
                 if chase != []:
-                    def takeSecond(elem):
-                        return elem[1]
-
-                    chase.sort(key=takeSecond)
+                    chase.sort(key=lambda x: x[1])
                     return 'chase', chase[0]
                 else:
                     if min(d) >= 8:
                         return 'eat_more', nearest_food
                     if 5 < min(d) < 8:
                         return 'sneak', certainFood()
-                return 'escape', nearestExit()
+                return 'escape', nearest_mid_point
+
+
 
             if min(eval_dist()) >= 8:
                 return 'eat_more', nearest_food
@@ -462,9 +465,29 @@ class Friendly(ReflexCaptureAgent):
             return nearest_mid_point
 
         def certainFood():
-            return nearest_food
+            x = lambda f: self.getMazeDistance(f, current_position)
+            food = accessibleFood()
+            dists = []
+            if food == []:
+                return current_position
+            for f in food:
+                dists.append((f, x(f)))
 
+            dists.sort(key=lambda x: x[1])
+            return dists[0][0]
 
+        def accessibleFood():
+            food = self.getFood(gameState).asList()
+            accessible_food = []
+            for f in food:
+                isRisky = False
+                for op in self.opponents_index:
+                    for pos in self.distributions[op]:
+                        if self.distributions[op][pos] != 0 and util.manhattanDistance(pos, f) < 5:
+                            isRisky = True
+                if not isRisky:
+                    accessible_food.append(f)
+            return accessible_food
 
         strategy, goal = evalution()
         if strategy == 'eat_more':
@@ -475,7 +498,6 @@ class Friendly(ReflexCaptureAgent):
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
         if strategy == 'chase':
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
-
 
         #
         # if nearby_ghosts:
@@ -493,5 +515,3 @@ class Friendly(ReflexCaptureAgent):
         # return self.waStarSearch(nearest_food, self.DetectOpponentGhostsHeuristic)
         #
         #
-
-
