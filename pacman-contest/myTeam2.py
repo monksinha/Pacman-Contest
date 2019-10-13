@@ -16,6 +16,7 @@ import distanceCalculator
 import random, time, util, sys
 
 from game import Directions
+from game import Actions
 import game
 
 import math
@@ -51,7 +52,7 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Monte Carlo Tree Node #
 #########################
 class TreeNode:
-    def __init__(self, gameState, simulationStep= 6):
+    def __init__(self, gameState, simulationStep= 10):
         '''
         simulationStep: how far we want to simulate in MCT
         visitTime: how many times the node is visited
@@ -99,6 +100,11 @@ class TreeNode:
     def avgReward(self):
         return self.reward/float(self.visitTime)
 
+    def getPrevState(self):
+        if self.parent is not None:
+            return self.parent.gameState
+        else:
+            return None
 
 
 #####################
@@ -117,14 +123,9 @@ class MctsAgent(CaptureAgent):
 
     def chooseAction(self, gameState):
         start = time.time()
-        currNode = self.mctSearch(gameState)
-        avgRewards = []
-        for child in currNode.children:
-            avgReward = child.avgReward()
-            avgRewards.append(avgReward)
-        maxReward = max(avgRewards)
-        candidateNodes = [child for child, reward in zip(currNode.children,avgRewards) if reward == maxReward]
-        nextNode = random.choice(candidateNodes)
+        rootNode = self.mctSearch(gameState)
+        path = self.generatePath(rootNode)
+        nextNode = path[1]
         nextState = nextNode.gameState
         action = nextState.getAgentState(self.index).configuration.direction
         print('eval time for agent %d: %.4f' % (self.index, time.time() - start))
@@ -161,20 +162,10 @@ class MctsAgent(CaptureAgent):
         return features * weights
 
     def getFeatures(self, gameState, action):
-        """
-        Returns a counter of features for the state
-        """
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-        features['successorScore'] = self.getScore(successor)
-        return features
+        pass
 
     def getWeights(self, gameState, action):
-        """
-        Normally, weights do not depend on the gamestate.  They can be either
-        a counter or a dictionary.
-        """
-        return {'successorScore': 1.0}
+        pass
 
 
     ####################
@@ -284,6 +275,12 @@ class MctsAgent(CaptureAgent):
         else:
             return False
 
+    def getPreviousAction(self, gameState):
+        '''
+        :return: action from previous state to current state
+        '''
+        return gameState.getAgentState(self.index).configuration.direction
+
 
 
     ##############################
@@ -311,6 +308,21 @@ class MctsAgent(CaptureAgent):
             iterations -= 1
 
         return rootNode
+
+    def generatePath(self,currNode):
+        '''
+        generate the path of the Search Tree, based on the ucb value
+        '''
+        path = [currNode]
+        while currNode.children is not None:
+            children = currNode.children
+            ucbValues = [self.ucbValue(child) for child in children]
+            maxValue = max(ucbValues)
+            candidateNodes = [child for child, value in zip(children, ucbValues) if value == maxValue]
+            currNode = random.choice(candidateNodes)
+            path.append(currNode)
+        return path
+
 
     def ucbValue(self, currNode, rho = 1.0, Q0 = math.inf):
         '''
@@ -355,17 +367,23 @@ class MctsAgent(CaptureAgent):
         '''
         simulate game by randomly choosing next action until we reach the step limit
         '''
-        gameState = currNode.gameState
+        currState = currNode.gameState
+        prevState = currNode.getPrevState()
+        prevAction = self.getPreviousAction(currState)
         totalRewards = 0
         step = currNode.simluationStep
+        prev_value = self.evaluate(prevState, prevAction)
         while step > 0:
-            actions = gameState.getLegalActions(self.index)
+            actions = currState.getLegalActions(self.index)
             actions.remove(Directions.STOP)
             nextAction = random.choice(actions)
             power = currNode.simluationStep - step
-            totalRewards += discount**power * self.evaluate(gameState, nextAction)
-            successor = self.getSuccessor(gameState, nextAction)
-            gameState = successor
+            curr_value = self.evaluate(currState, nextAction)
+            reward = curr_value - prev_value
+            totalRewards += discount**power * reward
+            successor = self.getSuccessor(currState, nextAction)
+            currState = successor
+            prev_value = curr_value
             step -= 1
         return totalRewards
 
@@ -388,8 +406,10 @@ class OffensiveAgent(MctsAgent):
     # def chooseAction(self, gameState):
 
 
-
     def getFeatures(self, gameState, action):
+        """
+        Returns a counter of features for the state
+        """
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
 
@@ -431,6 +451,9 @@ class OffensiveAgent(MctsAgent):
 
 
     def getWeights(self, gameState, action):
+        """
+        Returns a counter of weights for the state
+        """
         weights = util.Counter()
         # basic weights
         weights['stop'] = -10
@@ -465,8 +488,10 @@ class DefensiveAgent(MctsAgent):
     # def chooseAction(self, gameState):
 
 
-
     def getFeatures(self, gameState, action):
+        """
+        Returns a counter of features for the state
+        """
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
 
@@ -492,6 +517,9 @@ class DefensiveAgent(MctsAgent):
         return features
 
     def getWeights(self, gameState, action):
+        """
+        Returns a counter of weights for the state
+        """
         weights = util.Counter()
         weights['stop'] = -10
         weights['reverse'] = -10
