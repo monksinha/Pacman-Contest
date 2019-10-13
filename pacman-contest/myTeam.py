@@ -254,12 +254,12 @@ class ReflexCaptureAgent(CaptureAgent):
         return []
 
     def updateDistribution(self):
-        if self.getPreviousObservation() is None:
-            return self.prePossiblePosition
+        if self.getPreviousObservation is None:
+            return ReflexCaptureAgent.prePossiblePosition
         my_cur_gs = self.getCurrentObservation()
         my_pre_gs = self.getPreviousObservation() if self.getPreviousObservation() is not None else my_cur_gs
-        tm_cur_gs = self.teammate.getCurrentObservation() if self.teammate.getCurrentObservation() is not None else my_cur_gs
-        tm_pre_gs = self.teammate.getPreviousObservation() if self.teammate.getPreviousObservation() is not None else tm_cur_gs
+        tm_cur_gs = self.teammate.getCurrentObservation() if self.teammate.observationHistory != [] else my_cur_gs
+        tm_pre_gs = self.teammate.getPreviousObservation() if len(self.teammate.observationHistory) > 1 else tm_cur_gs
         pre_distances = my_pre_gs.getAgentDistances()
         pre_position = my_pre_gs.getAgentPosition(self.index)
         cur_distances = my_cur_gs.getAgentDistances()
@@ -277,17 +277,17 @@ class ReflexCaptureAgent(CaptureAgent):
         for op_idx in [pre_op_idx, next_op_idx]:
             op_position = my_cur_gs.getAgentPosition(op_idx)
             if op_position is not None:
-                self.distributions[op_idx] = util.Counter()
-                self.prePossiblePosition[op_idx] = util.Counter()
-                self.distributions[op_idx][op_position] = 1
-                self.prePossiblePosition[op_idx][op_position] = 1
+                ReflexCaptureAgent.distributions[op_idx] = util.Counter()
+                ReflexCaptureAgent.prePossiblePosition[op_idx] = util.Counter()
+                ReflexCaptureAgent.distributions[op_idx][op_position] = 1
+                ReflexCaptureAgent.prePossiblePosition[op_idx][op_position] = 1
                 if op_position == cur_position:
-                    self.initStartPositionPossibility(op_idx)
-                    self.distributions[op_idx] = self.prePossiblePosition.copy()
+                    ReflexCaptureAgent.initStartPositionPossibility(op_idx)
+                    ReflexCaptureAgent.distributions[op_idx] = ReflexCaptureAgent.prePossiblePosition[op_idx].copy()
                 continue
 
             for pos in self.legalPosition:
-                self.distributions[op_idx][pos] = 0
+                ReflexCaptureAgent.distributions[op_idx][pos] = 0
                 if op_idx == pre_op_idx:
                     if cur_distances[op_idx] - delta <= util.manhattanDistance(cur_position, pos) \
                             <= cur_distances[op_idx] + delta and pre_distances[op_idx] - delta - 1 <= \
@@ -295,7 +295,7 @@ class ReflexCaptureAgent(CaptureAgent):
                             and cur_distances1[op_idx] - delta - 1 <= util.manhattanDistance(cur_position1, pos) \
                             <= cur_distances1[op_idx] + delta + 1 and pre_distances1[op_idx] - delta - 2 <= \
                             util.manhattanDistance(pre_position1, pos) <= pre_distances1[op_idx] + delta + 2:
-                        self.distributions[op_idx][pos] = 1
+                        ReflexCaptureAgent.distributions[op_idx][pos] = 1
                 else:
                     if cur_distances[op_idx] - delta - 1 <= util.manhattanDistance(cur_position, pos) \
                             <= cur_distances[op_idx] + delta + 1 and pre_distances[op_idx] - delta - 2 <= \
@@ -303,11 +303,11 @@ class ReflexCaptureAgent(CaptureAgent):
                             and cur_distances1[op_idx] - delta <= util.manhattanDistance(cur_position1, pos) \
                             <= cur_distances1[op_idx] + delta and pre_distances1[op_idx] - delta - 1 <= \
                             util.manhattanDistance(pre_position1, pos) <= pre_distances1[op_idx] + delta + 1:
-                        self.distributions[op_idx][pos] = 1
+                        ReflexCaptureAgent.distributions[op_idx][pos] = 1
 
             cur_possible = util.Counter()
-            for pos in self.prePossiblePosition[op_idx].keys():
-                if self.prePossiblePosition[op_idx][pos] == 1:
+            for pos in ReflexCaptureAgent.prePossiblePosition[op_idx].keys():
+                if ReflexCaptureAgent.prePossiblePosition[op_idx][pos] !=0 :
                     cur_possible[pos] = 1
                     if op_idx == pre_op_idx:
                         for p, _ in self.GetSuccessors(pos):
@@ -315,33 +315,33 @@ class ReflexCaptureAgent(CaptureAgent):
             for pos in cur_possible.keys():
                 if util.manhattanDistance(pos, cur_position) <= 5:
                     cur_possible[pos] = 0
-                if util.manhattanDistance(pos, cur_position1) <= 5:
-                    cur_possible[pos] = 0
+                # if util.manhattanDistance(pos, cur_position1) <= 5:
+                #     cur_possible[pos] = 0
 
             isSeen = False
             for pos in cur_possible.keys():
-                if self.distributions[op_idx][pos] == 0:
+                if ReflexCaptureAgent.distributions[op_idx][pos] == 0:
                     cur_possible[pos] = 0
                 elif cur_possible[pos] != 0:
                     isSeen = True
             if isSeen:
-                self.distributions[op_idx] = util.Counter()
-                self.prePossiblePosition[op_idx] = util.Counter()
-                self.distributions[op_idx] = cur_possible.copy()
-                self.prePossiblePosition[op_idx] = cur_possible.copy()
+                ReflexCaptureAgent.distributions[op_idx] = util.Counter()
+                ReflexCaptureAgent.prePossiblePosition[op_idx] = util.Counter()
+                ReflexCaptureAgent.distributions[op_idx] = cur_possible.copy()
+                ReflexCaptureAgent.prePossiblePosition[op_idx] = cur_possible.copy()
             else:
-                self.distributions[op_idx] = util.Counter()
-                self.prePossiblePosition[op_idx] = util.Counter()
+                ReflexCaptureAgent.distributions[op_idx] = util.Counter()
+                ReflexCaptureAgent.prePossiblePosition[op_idx] = util.Counter()
                 for rebornPos in self.opt_reborn_poss[op_idx]:
-                    self.prePossiblePosition[op_idx][rebornPos] = 1
-                    self.distributions[op_idx][rebornPos] = 1
+                    ReflexCaptureAgent.prePossiblePosition[op_idx][rebornPos] = 1
+                    ReflexCaptureAgent.distributions[op_idx][rebornPos] = 1
                     for p, _ in self.GetSuccessors(rebornPos):
-                        self.prePossiblePosition[op_idx][p] = 1
-                        self.distributions[op_idx][p] = 1
+                        ReflexCaptureAgent.prePossiblePosition[op_idx][p] = 1
+                        ReflexCaptureAgent.distributions[op_idx][p] = 1
         for i in range(4):
-            l = len([k for k in self.distributions[i] if self.distributions[i][k] != 0])
-            self.distributions[i].divideAll(l) if l != 0 else None
-        return self.distributions
+            l = len([k for k in ReflexCaptureAgent.distributions[i] if ReflexCaptureAgent.distributions[i][k] != 0])
+            ReflexCaptureAgent.distributions[i].divideAll(l) if l != 0 else None
+        return ReflexCaptureAgent.distributions
 
     def UpdateFoodList(self, gameState):
         pos = gameState.getAgentState(self.index).getPosition()
@@ -458,7 +458,29 @@ class Friendly(ReflexCaptureAgent):
                     count -= self.distributions[op_idx][pos]
         return True if count > 0 else False
 
+    def updateGate(self):
+        gate = util.Counter()
+        _max = 0
+
+        def cal_nearest_food(pos):
+            _min = 999
+            for f in self.getFood(self.getCurrentObservation()).asList():
+                dist = self.getMazeDistance(f, pos)
+                _min = min(_min, dist)
+            return _min
+
+        for pos in self.mid_points:
+            d = cal_nearest_food(pos)
+            gate[pos] = d
+            _max = max(_max, d)
+        for pos in gate.keys():
+            gate[pos] = _max / gate[pos]
+        gate.normalize()
+        return gate
+
     def chooseAction(self, gameState):
+        gate = self.updateGate()
+
         def canSurvive():
             exitPath = self.waStarSearchFullPath(nearest_mid_point, self.manhattanHeuristic)
             # print(exitPath)
@@ -511,9 +533,11 @@ class Friendly(ReflexCaptureAgent):
                 if chase != []:
                     chase.sort(key=lambda x: x[1])
                     return 'chase', chase[0][0]
+                elif isInv:
+                    return 'eat_more',nearest_food
                 else:
-                    if min(d) >= 8:
-                        return 'eat_more', nearest_food
+                    if min(d) >= 6:
+                        return 'eat_more', certainFood()
                     if 5 < min(d) < 8:
                         return 'sneak', certainFood()
                 return 'escape', nearest_mid_point
@@ -588,6 +612,18 @@ class Friendly(ReflexCaptureAgent):
                 else:
                     self.invincible_state = (False, 0)
 
+        def pickAGate():
+            candidate = {}
+            for pos in gate.keys():
+                for op in self.opponents_index:
+                    for p in self.distributions[op].keys():
+                        if util.manhattanDistance(pos, p) > 4 * self.distributions[op][pos]:
+                            candidate[pos] = gate[pos]
+            return sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
+
+        picked_gate = pickAGate()
+        if self.mTerritory[cur_pos] and cur_pos != picked_gate:
+            return self.waStarSearch(picked_gate, self.manhattanHeuristic)
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
