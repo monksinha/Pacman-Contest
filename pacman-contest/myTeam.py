@@ -91,6 +91,9 @@ class ReflexCaptureAgent(CaptureAgent):
         self.eaten_foods_distance = []
         self.nearest_eaten_food = None
         # --------------------------------------------
+        self.pre_op_idx = (4 + self.index - 1) % 4
+        self.next_op_idx = (4 + self.index + 1) % 4
+
         self.opponents_index = self.getOpponents(gameState)
         self.opt_init_pos[self.opponents_index[0]] = p1 = gameState.getInitialAgentPosition(self.opponents_index[0])
         self.opt_init_pos[self.opponents_index[1]] = p2 = gameState.getInitialAgentPosition(self.opponents_index[1])
@@ -181,12 +184,12 @@ class ReflexCaptureAgent(CaptureAgent):
         xy2 = goal
         return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
 
-    def DetectOpponentGhostsHeuristic(self, thisPosition, goal):
+    def DetectOpponentGhostsHeuristic(self, pos, goal):
         heuristics = []
-        heuristics.append(self.manhattanHeuristic(thisPosition, goal))
+        heuristics.append(self.manhattanHeuristic(pos, goal))
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
-            if self.getMazeDistance(thisPosition, ghost.getPosition()) < 2:
+            if self.getMazeDistance(pos, ghost.getPosition()) < 2:
                 heuristics.append(999999)
         return max(heuristics)
 
@@ -222,6 +225,33 @@ class ReflexCaptureAgent(CaptureAgent):
                     heap.push(self.Node(successor_states, successor_path, successor_cost),
                               successor_cost + weight * heuristic(successor_state, goal))
         return 'Stop'
+
+    def waStarSearchFullPath(self, goal, heuristic=nullHeuristic):
+        gameState = self.getCurrentObservation()
+        start_position = gameState.getAgentState(self.index).getPosition()
+        weight = 2
+        heap = util.PriorityQueue()
+        heap.push(self.Node([start_position], [], 0), 0)
+        visited = {start_position: 0}
+        while not heap.isEmpty():
+            node = heap.pop()
+            states = node.states
+            pos = states[-1]
+            path = node.path
+            cost = node.cost
+            if pos == goal:
+                return states if path else []
+            for successor in self.GetSuccessors(pos):
+                successor_state = successor[0]
+                successor_direction = successor[1]
+                successor_cost = cost + heuristic(successor_state, goal)
+                if successor_state not in visited or visited[successor_state] > successor_cost:
+                    visited[successor_state] = successor_cost
+                    successor_states = states + [successor_state]
+                    successor_path = path + [successor_direction]
+                    heap.push(self.Node(successor_states, successor_path, successor_cost),
+                              successor_cost + weight * heuristic(successor_state, goal))
+        return []
 
     def updateDistribution(self):
         if self.getPreviousObservation() is None:
@@ -308,6 +338,9 @@ class ReflexCaptureAgent(CaptureAgent):
                     for p, _ in self.GetSuccessors(rebornPos):
                         self.prePossiblePosition[op_idx][p] = 1
                         self.distributions[op_idx][p] = 1
+        for i in range(4):
+            l = len([k for k in self.distributions[i] if self.distributions[i][k] != 0])
+            self.distributions[i].divideAll(l) if l != 0 else None
         return self.distributions
 
     def UpdateFoodList(self, gameState):
@@ -421,14 +454,29 @@ class Friendly(ReflexCaptureAgent):
         for pos in self.distributions[op_idx].keys():
             if self.distributions[op_idx][pos] != 0:
                 if self.mTerritory[pos]:
-                    count += 1
+                    count += self.distributions[op_idx][pos]
                 else:
-                    count -= 1
+                    count -= self.distributions[op_idx][pos]
         return True if count > 0 else False
 
     def chooseAction(self, gameState):
-        current_position = gameState.getAgentState(self.index).getPosition()
-        mid_distances = [self.getMazeDistance(current_position, mid_point) for mid_point in self.mid_points]
+        def canSurvive():
+            exitPath = self.waStarSearchFullPath(nearest_mid_point, self.manhattanHeuristic)
+            print(exitPath)
+            _keyPos = cur_pos
+            for op_idx in self.opponents_index:
+                _min = 999
+                for epPos in exitPath:
+                    for enemyP in [k for k in self.distributions[op_idx].keys() if self.distributions[op_idx][k] > 0]:
+                        if _min > self.getMazeDistance(epPos, enemyP):
+                            _min = self.getMazeDistance(epPos, enemyP)
+                            _keyPos = epPos
+                if self.getMazeDistance(_keyPos, cur_pos) > _min:  # calculate probability
+                    return False, len(exitPath)
+            return True, len(exitPath)
+
+        cur_pos = gameState.getAgentState(self.index).getPosition()
+        mid_distances = [self.getMazeDistance(cur_pos, mid_point) for mid_point in self.mid_points]
         nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
         nearest_capsule = self.GetNearestCapsule(gameState)
         nearest_food = self.GetNearestFood(gameState)
@@ -438,21 +486,23 @@ class Friendly(ReflexCaptureAgent):
         carry_points = self.getCurrentObservation().getAgentState(self.index).numCarrying
 
         self.displayDistributionsOverPositions(self.updateDistribution())
+        _canSurvive, exitPathLen = canSurvive()
 
         # print(self.isInvade(self.opponents_index[0]))
 
         def evalution():
             nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
-            if carry_points > 5:
+            if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
+                                                                                             certainFood()) >= 2:
                 return 'escape', nearest_mid_point
             if nearby_ghosts:
                 isInv, leftTime = self.invincible_state
                 d = []
                 chase = []
                 for g in nearby_ghosts:
-                    dis = self.getMazeDistance(current_position, g.getPosition())
+                    dis = self.getMazeDistance(cur_pos, g.getPosition())
                     d.append(dis)
-                    if isInv and leftTime > dis:
+                    if isInv and g.scaredTimer > dis:
                         chase.append((g.getPosition(), dis))
 
                 if chase != []:
@@ -467,8 +517,8 @@ class Friendly(ReflexCaptureAgent):
 
             if min(eval_dist()) >= 8:
                 return 'eat_more', nearest_food
-            if 5 <= min(eval_dist()) < 8:
-                return 'sneak', certainFood()
+            if 5 == min(eval_dist()):
+                return 'sneak', sneakPosition()
 
             return 'eat_more', nearest_food
 
@@ -491,12 +541,21 @@ class Friendly(ReflexCaptureAgent):
         def nearestExit():
             return nearest_mid_point
 
+        def sneakPosition():
+            for op in [self.pre_op_idx, self.next_op_idx]:
+                enemyPos = self.getCurrentObservation().getAgentState(op).getPosition()
+                if enemyPos is not None:
+                    for next_step, _ in self.GetSuccessors(cur_pos):
+                        if util.manhattanDistance(next_step, enemyPos) > util.manhattanDistance(cur_pos, enemyPos):
+                            return next_step
+            return certainFood()
+
         def certainFood():
-            x = lambda f: self.getMazeDistance(f, current_position)
+            x = lambda f: self.getMazeDistance(f, cur_pos)
             food = accessibleFood()
             dists = []
             if food == []:
-                return current_position
+                return cur_pos
             for f in food:
                 dists.append((f, x(f)))
 
@@ -509,8 +568,8 @@ class Friendly(ReflexCaptureAgent):
             for f in food:
                 isRisky = False
                 for op in self.opponents_index:
-                    for pos in self.distributions[op]:
-                        if self.distributions[op][pos] != 0 and util.manhattanDistance(pos, f) < 5:
+                    for pos in self.distributions[op].keys():
+                        if util.manhattanDistance(pos, f) < 4*self.distributions[op][pos]:
                             isRisky = True
                 if not isRisky:
                     accessible_food.append(f)
@@ -518,7 +577,7 @@ class Friendly(ReflexCaptureAgent):
 
         def update_Invincible():
             isInvincible, leftTime = self.invincible_state
-            if current_position in capsules:
+            if cur_pos in capsules:
                 self.invincible_state = (True, SCARED_TIME)
             elif isInvincible:
                 if leftTime - 1 > 0:
@@ -528,7 +587,7 @@ class Friendly(ReflexCaptureAgent):
 
         strategy, goal = evalution()
         update_Invincible()
-        print(self.invincible_state)
+        # print(self.invincible_state)
 
         if strategy == 'eat_more':
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
