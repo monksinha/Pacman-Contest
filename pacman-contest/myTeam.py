@@ -307,7 +307,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
             cur_possible = util.Counter()
             for pos in ReflexCaptureAgent.prePossiblePosition[op_idx].keys():
-                if ReflexCaptureAgent.prePossiblePosition[op_idx][pos] !=0 :
+                if ReflexCaptureAgent.prePossiblePosition[op_idx][pos] != 0:
                     cur_possible[pos] = 1
                     if op_idx == pre_op_idx:
                         for p, _ in self.GetSuccessors(pos):
@@ -479,7 +479,6 @@ class Friendly(ReflexCaptureAgent):
         return gate
 
     def chooseAction(self, gameState):
-        gate = self.updateGate()
 
         def canSurvive():
             exitPath = self.waStarSearchFullPath(nearest_mid_point, self.manhattanHeuristic)
@@ -534,7 +533,7 @@ class Friendly(ReflexCaptureAgent):
                     chase.sort(key=lambda x: x[1])
                     return 'chase', chase[0][0]
                 elif isInv:
-                    return 'eat_more',nearest_food
+                    return 'eat_more', nearest_food
                 else:
                     if min(d) >= 6:
                         return 'eat_more', certainFood()
@@ -613,12 +612,17 @@ class Friendly(ReflexCaptureAgent):
                     self.invincible_state = (False, 0)
 
         def pickAGate():
+            gate = self.updateGate()
             candidate = {}
             for pos in gate.keys():
+                flag = True
                 for op in self.opponents_index:
-                    for p in self.distributions[op].keys():
-                        if util.manhattanDistance(pos, p) > 4 * self.distributions[op][pos]:
-                            candidate[pos] = gate[pos]
+                    if not self.isInvade(op):
+                        for p in [k for k in self.distributions[op].keys() if self.distributions[op][k] != 0]:
+                            if util.manhattanDistance(pos, p) < 5 * self.distributions[op][pos]:
+                                flag = False
+                if flag:
+                    candidate[pos] = gate[pos]
             return sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
 
         picked_gate = pickAGate()
