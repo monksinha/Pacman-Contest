@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendly'):
+def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Positive'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
