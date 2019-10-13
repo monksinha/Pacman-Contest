@@ -619,10 +619,11 @@ class Friendly(ReflexCaptureAgent):
                 for op in self.opponents_index:
                     if not self.isInvade(op):
                         for p in [k for k in self.distributions[op].keys() if self.distributions[op][k] != 0]:
-                            if util.manhattanDistance(pos, p) < 5 * self.distributions[op][pos]:
+                            if util.manhattanDistance(pos, p) < 5 * self.distributions[op][p]:
                                 flag = False
                 if flag:
                     candidate[pos] = gate[pos]
+            print(candidate)
             return sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
 
         picked_gate = pickAGate()
