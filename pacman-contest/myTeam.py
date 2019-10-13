@@ -283,7 +283,7 @@ class ReflexCaptureAgent(CaptureAgent):
                 ReflexCaptureAgent.prePossiblePosition[op_idx][op_position] = 1
                 if op_position == cur_position:
                     ReflexCaptureAgent.initStartPositionPossibility(op_idx)
-                    ReflexCaptureAgent.distributions[op_idx] = ReflexCaptureAgent.prePossiblePosition.copy()
+                    ReflexCaptureAgent.distributions[op_idx] = ReflexCaptureAgent.prePossiblePosition[op_idx].copy()
                 continue
 
             for pos in self.legalPosition:
@@ -307,7 +307,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
             cur_possible = util.Counter()
             for pos in ReflexCaptureAgent.prePossiblePosition[op_idx].keys():
-                if ReflexCaptureAgent.prePossiblePosition[op_idx][pos] == 1:
+                if ReflexCaptureAgent.prePossiblePosition[op_idx][pos] !=0 :
                     cur_possible[pos] = 1
                     if op_idx == pre_op_idx:
                         for p, _ in self.GetSuccessors(pos):
@@ -315,8 +315,8 @@ class ReflexCaptureAgent(CaptureAgent):
             for pos in cur_possible.keys():
                 if util.manhattanDistance(pos, cur_position) <= 5:
                     cur_possible[pos] = 0
-                if util.manhattanDistance(pos, cur_position1) <= 5:
-                    cur_possible[pos] = 0
+                # if util.manhattanDistance(pos, cur_position1) <= 5:
+                #     cur_possible[pos] = 0
 
             isSeen = False
             for pos in cur_possible.keys():
@@ -533,9 +533,11 @@ class Friendly(ReflexCaptureAgent):
                 if chase != []:
                     chase.sort(key=lambda x: x[1])
                     return 'chase', chase[0][0]
+                elif isInv:
+                    return 'eat_more',nearest_food
                 else:
-                    if min(d) >= 8:
-                        return 'eat_more', nearest_food
+                    if min(d) >= 6:
+                        return 'eat_more', certainFood()
                     if 5 < min(d) < 8:
                         return 'sneak', certainFood()
                 return 'escape', nearest_mid_point
