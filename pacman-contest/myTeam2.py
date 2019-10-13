@@ -52,7 +52,7 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Monte Carlo Tree Node #
 #########################
 class TreeNode:
-    def __init__(self, gameState, simulationStep= 10):
+    def __init__(self, gameState, simulationStep= 6):
         '''
         simulationStep: how far we want to simulate in MCT
         visitTime: how many times the node is visited
@@ -122,6 +122,9 @@ class MctsAgent(CaptureAgent):
         CaptureAgent.registerInitialState(self, gameState)
 
     def chooseAction(self, gameState):
+        '''
+        choose the best action according to the Monte Carlo Tree path
+        '''
         start = time.time()
         rootNode = self.mctSearch(gameState)
         path = self.generatePath(rootNode)
@@ -275,13 +278,17 @@ class MctsAgent(CaptureAgent):
         else:
             return False
 
-    def getPreviousAction(self, gameState):
+    def getCurrentAction(self, gameState):
         '''
         :return: action from previous state to current state
         '''
         return gameState.getAgentState(self.index).configuration.direction
 
-
+    def getReverseAction(self,gameState):
+        '''
+        :return: action from current state to previous state
+        '''
+        return Directions.REVERSE[self.getCurrentAction(gameState)]
 
     ##############################
     # Monte Carlo Tree functions #
@@ -368,22 +375,19 @@ class MctsAgent(CaptureAgent):
         simulate game by randomly choosing next action until we reach the step limit
         '''
         currState = currNode.gameState
-        prevState = currNode.getPrevState()
-        prevAction = self.getPreviousAction(currState)
         totalRewards = 0
         step = currNode.simluationStep
-        prev_value = self.evaluate(prevState, prevAction)
         while step > 0:
             actions = currState.getLegalActions(self.index)
             actions.remove(Directions.STOP)
+            reverse = self.getReverseAction(currState)
+            if reverse in actions and len(actions) > 1:
+                actions.remove(reverse)
             nextAction = random.choice(actions)
             power = currNode.simluationStep - step
-            curr_value = self.evaluate(currState, nextAction)
-            reward = curr_value - prev_value
-            totalRewards += discount**power * reward
+            totalRewards += discount**power * self.evaluate(currState, nextAction)
             successor = self.getSuccessor(currState, nextAction)
             currState = successor
-            prev_value = curr_value
             step -= 1
         return totalRewards
 
@@ -415,7 +419,7 @@ class OffensiveAgent(MctsAgent):
 
         myState = successor.getAgentState(self.index)
         # myPos = myState.getPosition()
-        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
+        reverse = self.getReverseAction(gameState)
         foodDistance = self.getFoodDistance(successor)
         capsuleDistance = self.getCapsuleDistance(successor)
         ghostDistance = self.getGhostDistance(successor)
@@ -456,8 +460,8 @@ class OffensiveAgent(MctsAgent):
         """
         weights = util.Counter()
         # basic weights
-        weights['stop'] = -10
-        weights['reverse'] = -10
+        weights['stop'] = -20
+        weights['reverse'] = -20
         weights['isDead'] = -1000
         weights['distanceToGhost'] = 100
         weights['distanceToFood'] = -5
@@ -496,7 +500,7 @@ class DefensiveAgent(MctsAgent):
         successor = self.getSuccessor(gameState, action)
 
         myState = successor.getAgentState(self.index)
-        reverse = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
+        reverse = self.getReverseAction(gameState)
         invaderDistance = self.getInvaderDistance(successor)
 
         if not myState.isPacman:
@@ -521,8 +525,8 @@ class DefensiveAgent(MctsAgent):
         Returns a counter of weights for the state
         """
         weights = util.Counter()
-        weights['stop'] = -10
-        weights['reverse'] = -10
+        weights['stop'] = -20
+        weights['reverse'] = -20
         weights['invaderDistance'] = -10
         weights['onDefense'] = 100
 
