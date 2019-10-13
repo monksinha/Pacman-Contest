@@ -323,7 +323,7 @@ class ReflexCaptureAgent(CaptureAgent):
         self.food_list = current_food_list
         if eaten_foods:
             self.nearest_eaten_food = self.GetNearestObject(eaten_foods, eaten_foods_distance)
-        self.Log(self.nearest_eaten_food)
+        # self.Log(self.nearest_eaten_food)
 
 
 
