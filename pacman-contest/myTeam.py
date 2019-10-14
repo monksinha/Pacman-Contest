@@ -601,8 +601,9 @@ class Friendly(ReflexCaptureAgent):
 
         def show_legalpos():
             show_lp = util.Counter()
-            for i in self.food_list:
-                show_lp[i] = 1
+            for i in self.lane_food:
+                if self.lane_food[i]!=0:
+                    show_lp[i] = 1
             self.displayDistributionsOverPositions([show_lp])
 
         # show_legalpos()
@@ -666,7 +667,9 @@ class Friendly(ReflexCaptureAgent):
             cur_food[f] = self.getMazeDistance(f, cur_pos)
 
         self.update_lane_food()
+
         self.displayDistributionsOverPositions(self.updateDistribution())
+        # show_legalpos()
 
         _canSurvive, exitPathLen, delta_step = canSurvive()
 
@@ -723,7 +726,7 @@ class Friendly(ReflexCaptureAgent):
                                 for lane in self.lane.keys():
                                     if f in self.lane[lane]:
                                         entrance = self.lane_end_start[lane]
-                                if self.getMazeDistance(g.getPosition(), entrance) + 1 <= cost_lane_food(f, cur_pos):
+                                if self.getMazeDistance(g.getPosition(), entrance) <= cost_lane_food(f, cur_pos)+1:
                                     can_eat = False
                         if can_eat:
                             return "eat_more", f
