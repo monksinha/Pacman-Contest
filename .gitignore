@@ -2,4 +2,5 @@
 *.idea
 *.pyc
 venv/
-pacman-contest/myTeam3.py
+*.replay
+*.replay
