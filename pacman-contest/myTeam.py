@@ -210,6 +210,17 @@ class ReflexCaptureAgent(CaptureAgent):
                 heuristics.append(999999)
         return max(heuristics)
 
+
+    def DetectOpponentPacmansHeuristic(self, pos, goal):
+        heuristics = []
+        heuristics.append(self.manhattanHeuristic(pos, goal))
+        pacmans = self.GetNearbyOpponentPacmans(self.getCurrentObservation())
+        for pacman in pacmans:
+            if self.getMazeDistance(pos, pacman.getPosition()) < 2:
+                heuristics.append(999999)
+        return max(heuristics)
+
+
     def changeGateHeuristic(self, pos, goal):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
@@ -226,7 +237,7 @@ class ReflexCaptureAgent(CaptureAgent):
     def waStarSearch(self, goal, heuristic=nullHeuristic):
         gameState = self.getCurrentObservation()
         start_position = gameState.getAgentState(self.index).getPosition()
-        weight = 1
+        weight = 2
         heap = util.PriorityQueue()
         heap.push(self.Node([start_position], [], 0), 0)
         visited = {start_position: 0}
@@ -253,7 +264,7 @@ class ReflexCaptureAgent(CaptureAgent):
     def waStarSearchFullPath(self, goal, heuristic=nullHeuristic):
         gameState = self.getCurrentObservation()
         start_position = gameState.getAgentState(self.index).getPosition()
-        weight = 1
+        weight = 2
         heap = util.PriorityQueue()
         heap.push(self.Node([start_position], [], 0), 0)
         visited = {start_position: 0}
@@ -435,17 +446,20 @@ class Negative(ReflexCaptureAgent):
         self.UpdateFoodList(gameState)
 
         if nearby_pacmans:
-            destination = nearby_pacmans[0].getPosition()
+            self.destination = nearby_pacmans[0].getPosition()
             if current_state.scaredTimer > 0:
                 for pacman in nearby_pacmans:
                     if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
-                        destination = self.start_position
-            return self.waStarSearch(destination, self.noCrossingHeuristic)
+                        self.destination = self.start_position
+            return self.waStarSearch(self.destination, self.DetectOpponentPacmansHeuristic)
+
         elif self.nearest_eaten_food is not None:
             return self.waStarSearch(self.nearest_eaten_food, self.noCrossingHeuristic)
+
         elif self.destination is None:
             self.destination = nearest_mid_point
             return self.waStarSearch(nearest_mid_point, self.noCrossingHeuristic)
+
         elif current_position == self.destination:
             self.destination = furthest_mid_point
 
