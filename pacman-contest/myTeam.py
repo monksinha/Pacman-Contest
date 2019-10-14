@@ -517,7 +517,7 @@ class Friendly(ReflexCaptureAgent):
 
         roadEnd = []
         self.lane = {}
-        self.lane_end_start={}
+        self.lane_end_start = {}
         for pos in self.legalPosition:
             l = len(self.GetSuccessors(pos))
             if l == 1:
@@ -533,7 +533,7 @@ class Friendly(ReflexCaptureAgent):
                         if i[0] not in road:
                             road.append(i[0])
             self.lane[p] = road
-            self.lane_end_start[p]=road[-1]
+            self.lane_end_start[p] = road[-1]
 
         # print(self.lane)
 
@@ -548,7 +548,7 @@ class Friendly(ReflexCaptureAgent):
             self.lane_food[f] = 0
             for lane in self.lane.keys():
                 if f in self.lane[lane]:
-                    self.lane_food[f] = max(self.getMazeDistance(f, self.lane_end_start[lane]),self.lane_food[f])
+                    self.lane_food[f] = max(self.getMazeDistance(f, self.lane_end_start[lane]), self.lane_food[f])
 
     def territory(self):
         x0, _ = self.start_position
@@ -672,7 +672,10 @@ class Friendly(ReflexCaptureAgent):
 
         # print(self.isInvade(self.opponents_index[0]))
         def isLaneFood(f):
-            return True if f in self.lane_food.keys() else False
+            if f in self.lane_food.keys() and self.lane_food[f] != 0:
+                return True
+            else:
+                return False
 
         def cost_lane_food(f, curP):
             return self.getMazeDistance(f, curP) + self.lane_food[f]
@@ -711,7 +714,7 @@ class Friendly(ReflexCaptureAgent):
 
                     return 'escape', bestExit()
                 else:
-                    if self.getMazeDistance(g.getPosition(),cur_pos)==1:
+                    if self.getMazeDistance(g.getPosition(), cur_pos) == 1:
                         return 'escape', bestExit()
                     for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
                         can_eat = True
