@@ -449,7 +449,7 @@ class Negative(ReflexCaptureAgent):
             self.destination = nearby_pacmans[0].getPosition()
             if current_state.scaredTimer > 0:
                 for pacman in nearby_pacmans:
-                    if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
+                    if self.getMazeDistance(current_position, pacman.getPosition()) <= 2:
                         self.destination = self.start_position
             return self.waStarSearch(self.destination, self.DetectOpponentPacmansHeuristic)
 
