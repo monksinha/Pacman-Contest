@@ -685,7 +685,7 @@ class Friendly(ReflexCaptureAgent):
 
         def evalution():
             nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
-            if self.getCurrentObservation().data.timeleft <= 5 + self.getMazeDistance(cur_pos, bestExit()):
+            if (self.getCurrentObservation().data.timeleft-1)/4 <= 5 + self.getMazeDistance(cur_pos, bestExit()):
                 return 'escape', bestExit()
             # if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
             #                                                                                  certainFood()) >= 2:
@@ -789,7 +789,18 @@ class Friendly(ReflexCaptureAgent):
             food = accessibleFood()
             dists = []
             if food == []:
-                return cur_pos
+                if carry_points>0:
+                    return bestExit()
+                else:
+                    _dic ={}
+                    remaining_foods =  self.getFood(gameState).asList()
+                    if remaining_foods!=[]:
+                        for f in remaining_foods:
+                            _dic[f] = self.getMazeDistance(f,cur_pos)
+                        _list=sorted(_dic.items(),key=lambda x:x[1])
+                        return _list[0][0]
+                    else:
+                        return bestExit()
             for f in food:
                 dists.append((f, x(f)))
 
