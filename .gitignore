@@ -4,3 +4,4 @@
 venv/
 *.replay
 *.replay
+pacman-contest/myTeam3.py
