@@ -669,7 +669,7 @@ class Friendly(ReflexCaptureAgent):
         self.update_lane_food()
 
         self.displayDistributionsOverPositions(self.updateDistribution())
-        # show_legalpos()
+        show_legalpos()
 
         _canSurvive, exitPathLen, delta_step = canSurvive()
 
@@ -694,11 +694,11 @@ class Friendly(ReflexCaptureAgent):
             #     return 'escape', bestExit()
             if nearby_ghosts:
                 isInv, leftTime = self.invincible_state
-                d = []
+                dists = []
                 chase = []
                 for g in nearby_ghosts:
                     dis = self.getMazeDistance(cur_pos, g.getPosition())
-                    d.append(dis)
+                    dists.append(dis)
                     # if isInv and g.scaredTimer > dis and self.getMazeDistance(nearest_food, cur_pos) > 3:
                     #     chase.append((g.getPosition(), dis))
 
@@ -717,8 +717,9 @@ class Friendly(ReflexCaptureAgent):
 
                     return 'escape', bestExit()
                 else:
-                    if self.getMazeDistance(g.getPosition(), cur_pos) == 1:
-                        return 'escape', bestExit()
+                    for d in dists:
+                        if d <= 2:
+                            return 'escape', bestExit()
                     for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
                         can_eat = True
                         for g in nearby_ghosts:
@@ -726,7 +727,7 @@ class Friendly(ReflexCaptureAgent):
                                 for lane in self.lane.keys():
                                     if f in self.lane[lane]:
                                         entrance = self.lane_end_start[lane]
-                                if self.getMazeDistance(g.getPosition(), entrance) <= cost_lane_food(f, cur_pos)+1:
+                                if self.getMazeDistance(g.getPosition(), entrance) < cost_lane_food(f, cur_pos)+1:
                                     can_eat = False
                         if can_eat:
                             return "eat_more", f
