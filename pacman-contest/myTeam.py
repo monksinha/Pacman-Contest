@@ -231,7 +231,7 @@ class ReflexCaptureAgent(CaptureAgent):
             for successor in self.GetSuccessors(pos):
                 successor_state = successor[0]
                 successor_direction = successor[1]
-                successor_cost = cost + heuristic(successor_state, goal)
+                successor_cost = cost + 1
                 if successor_state not in visited or visited[successor_state] > successor_cost:
                     visited[successor_state] = successor_cost
                     successor_states = states + [successor_state]
