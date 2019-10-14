@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Friendly', second='Negative'):
+def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -411,6 +411,9 @@ class ReflexCaptureAgent(CaptureAgent):
         # self.Log(self.nearest_eaten_food)
 
 
+####################
+# Offensive Agent 1#
+####################
 class Positive(ReflexCaptureAgent):
 
     def chooseAction(self, gameState):
@@ -442,6 +445,11 @@ class Positive(ReflexCaptureAgent):
 
         return self.waStarSearch(nearest_food, self.DetectOpponentGhostsHeuristic)
 
+
+
+####################
+# Defensive Agent  #
+####################
 
 class Negative(ReflexCaptureAgent):
 
@@ -496,6 +504,10 @@ class Negative(ReflexCaptureAgent):
         return self.waStarSearch(self.destination, self.noCrossingHeuristic)
 
 
+
+####################
+# Offensive Agent 2#
+####################
 class Friendly(ReflexCaptureAgent):
     def __init__(self, gameState):
         ReflexCaptureAgent.__init__(self, gameState)
@@ -852,7 +864,10 @@ class Friendly(ReflexCaptureAgent):
                 candidate[p] *= self.weight_gate[p]
             c_gate = sorted(candidate.items(), key=lambda x: x[1], reverse=True)
             print(c_gate)
-            return c_gate[0][0] if c_gate!=[] else certainFood()
+            if len(c_gate)!=0 and len(c_gate[0])!= 0:
+                return c_gate[0][0]
+            else:
+                return certainFood()
         
 
         def pickAGate2():
