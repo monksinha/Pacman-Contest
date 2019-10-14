@@ -217,7 +217,7 @@ class ReflexCaptureAgent(CaptureAgent):
         heuristics.append(self.manhattanHeuristic(pos, goal))
         (x, y) = pos
         if (self.red and x > self.midX) or (not self.red and x < self.midX):
-            heuristics.append(99)
+            heuristics.append(999)
         return max(heuristics)
 
     def DetectOpponentGhostsHeuristic(self, pos, goal):
@@ -602,7 +602,7 @@ class Friendly(ReflexCaptureAgent):
         def show_legalpos():
             show_lp = util.Counter()
             for i in self.lane_food:
-                if self.lane_food[i]!=0:
+                if self.lane_food[i] != 0:
                     show_lp[i] = 1
             self.displayDistributionsOverPositions([show_lp])
 
@@ -669,7 +669,7 @@ class Friendly(ReflexCaptureAgent):
         self.update_lane_food()
 
         self.displayDistributionsOverPositions(self.updateDistribution())
-        show_legalpos()
+        # show_legalpos()
 
         _canSurvive, exitPathLen, delta_step = canSurvive()
 
@@ -706,6 +706,7 @@ class Friendly(ReflexCaptureAgent):
                 #     chase.sort(key=lambda x: x[1])
                 #     return 'chase', chase[0][0]
                 if isInv:
+
                     for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
                         can_eat = True
                         for g in nearby_ghosts:
@@ -727,7 +728,7 @@ class Friendly(ReflexCaptureAgent):
                                 for lane in self.lane.keys():
                                     if f in self.lane[lane]:
                                         entrance = self.lane_end_start[lane]
-                                if self.getMazeDistance(g.getPosition(), entrance) < cost_lane_food(f, cur_pos)+1:
+                                if self.getMazeDistance(g.getPosition(), entrance) < cost_lane_food(f, cur_pos) + 1:
                                     can_eat = False
                         if can_eat:
                             return "eat_more", f
@@ -736,25 +737,38 @@ class Friendly(ReflexCaptureAgent):
             # if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
             #                                                                                  certainFood()) >= 2:
             #     return 'escape', bestExit()
-            if not _canSurvive and nearby_ghosts == [] and delta_step <= 2:
-                return 'escape', bestExit()
+            # if not _canSurvive and nearby_ghosts == [] and delta_step <= 2:
+            #     return 'escape', bestExit()
             # if min(eval_dist()) >= 8:
             #     return 'eat_more', nearest_food
             # if 5 == min(eval_dist()):
             #     return 'sneak', sneakPosition()
+            est_dis_me = min(eval_dist(cur_pos))
+            for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
+                can_eat = True
+                if isLaneFood(f):
+                    for lane in self.lane.keys():
+                        if f in self.lane[lane]:
+                            entrance = self.lane_end_start[lane]
+                            est_op_entr = min(eval_dist(entrance))
+                    if min(est_dis_me, est_op_entr) < cost_lane_food(f, cur_pos) + 1:
+                        can_eat = False
+                if can_eat:
+                    return "eat_more", f
+                if carry_points > 5 and self.getMazeDistance(bestExit(), cur_pos) <= self.getMazeDistance(f, cur_pos):
+                    return 'escape', bestExit()
 
-            return 'eat_more', certainFood()
+            return 'escape', bestExit()
 
-        def eval_dist():
+        def eval_dist(mPos):
             dists = []
-            cur_position = self.getCurrentObservation().getAgentState(self.index).getPosition()
 
             def nPP(idx):
                 curMin = 9999
                 distribution = self.distributions[idx]
                 for pos in distribution.keys():
                     if distribution[pos] != 0:
-                        curMin = min(self.getMazeDistance(cur_position, pos), curMin)
+                        curMin = min(self.getMazeDistance(mPos, pos), curMin)
                 return curMin
 
             for i in self.opponents_index:
@@ -799,7 +813,7 @@ class Friendly(ReflexCaptureAgent):
         def update_Invincible():
             isInvincible, leftTime = self.invincible_state
             if cur_pos in capsules:
-                self.invincible_state = (True, SCARED_TIME)
+                self.invincible_state = (True, SCARED_TIME - 2)
             elif isInvincible:
                 if leftTime - 1 > 0:
                     self.invincible_state = (True, leftTime - 1)
@@ -825,9 +839,10 @@ class Friendly(ReflexCaptureAgent):
             # self.weight_gate.normalize()
             for p in candidate.keys():
                 candidate[p] *= self.weight_gate[p]
-            c_gate = sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
+            c_gate = sorted(candidate.items(), key=lambda x: x[1], reverse=True)
             print(c_gate)
-            return c_gate if c_gate is not None else cur_pos
+            return c_gate[0][0] if c_gate!=[] else certainFood()
+        
 
         def pickAGate2():
             gate = {}
