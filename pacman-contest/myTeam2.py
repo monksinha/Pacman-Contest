@@ -185,7 +185,7 @@ class MctsAgent(CaptureAgent):
             distances = [self.getMazeDistance(myPos, ghost) for ghost in ghostList]
             return distances
         else:
-            return None
+            return []
 
     def getInvaderDistance(self, gameState):
         '''
@@ -198,7 +198,7 @@ class MctsAgent(CaptureAgent):
             distances = [self.getMazeDistance(myPos, invader) for invader in invaderList]
             return distances
         else:
-            return None
+            return []
 
     def getFoodDistance(self, gameState):
         '''
@@ -210,7 +210,7 @@ class MctsAgent(CaptureAgent):
             distances = [self.getMazeDistance(myPos, food) for food in foodList]
             return distances
         else:
-            return None
+            return []
 
     def getCapsuleDistance(self, gameState):
         '''
@@ -222,7 +222,7 @@ class MctsAgent(CaptureAgent):
             distances = [self.getMazeDistance(myPos, capsule) for capsule in capsuleList]
             return distances
         else:
-            return None
+            return []
 
     def getNumOfFoods(self, gameState):
         '''
@@ -428,13 +428,13 @@ class OffensiveAgent(MctsAgent):
             features['onAttack'] = 1
 
         features['foodsLeft'] = self.getNumOfFoods(successor)
-        if foodDistance is not None:
+        if len(foodDistance)>0:
             features['distanceToFood'] = min(foodDistance)
 
-        if capsuleDistance is not None:
+        if len(capsuleDistance)>0:
             features['distanceToCapsule'] = min(capsuleDistance)
 
-        if ghostDistance is not None:
+        if len(ghostDistance)>0:
             features['distanceToGhost'] = min(ghostDistance)
 
         features['distanceToBoundary'] = self.getDistanceToBoundary(successor)
@@ -506,7 +506,7 @@ class DefensiveAgent(MctsAgent):
         if not myState.isPacman:
             features['onDefense'] = 1
 
-        if invaderDistance is not None:
+        if len(invaderDistance) > 0:
             features['numInvaders'] = len(invaderDistance)
             features['invaderDistance'] = min(invaderDistance)
 
@@ -530,7 +530,7 @@ class DefensiveAgent(MctsAgent):
         weights['invaderDistance'] = -10
         weights['onDefense'] = 100
 
-        if self.getGhostDistance(gameState) is None:
+        if len(self.getGhostDistance(gameState)) == 0:
             weights['distanceToBoundary'] = -10
             weights['distanceToStart'] = 10
 

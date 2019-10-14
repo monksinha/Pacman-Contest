@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendly'):
+def createTeam(firstIndex, secondIndex, isRed, first='Friendly', second='Negative'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -118,6 +118,8 @@ class ReflexCaptureAgent(CaptureAgent):
         for idx in self.opponents_index:
             self.initStartPositionPossibility(idx)
 
+        self.midX = gameState.data.layout.width // 2 - 1 if self.red else gameState.data.layout.width // 2
+
         # --------------------------------------------
 
     def initStartPositionPossibility(self, index):
@@ -191,6 +193,14 @@ class ReflexCaptureAgent(CaptureAgent):
         xy2 = goal
         return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
 
+    def noCrossingHeuristic(self,pos,goal):
+        heuristics = []
+        heuristics.append(self.manhattanHeuristic(pos, goal))
+        (x,y) = pos
+        if (self.red and x > self.midX) or (not self.red and x < self.midX):
+            heuristics.append(999999)
+        return max(heuristics)
+
     def DetectOpponentGhostsHeuristic(self, pos, goal):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
@@ -199,6 +209,17 @@ class ReflexCaptureAgent(CaptureAgent):
             if self.getMazeDistance(pos, ghost.getPosition()) < 2:
                 heuristics.append(999999)
         return max(heuristics)
+
+
+    def DetectOpponentPacmansHeuristic(self, pos, goal):
+        heuristics = []
+        heuristics.append(self.manhattanHeuristic(pos, goal))
+        pacmans = self.GetNearbyOpponentPacmans(self.getCurrentObservation())
+        for pacman in pacmans:
+            if self.getMazeDistance(pos, pacman.getPosition()) < 2:
+                heuristics.append(999999)
+        return max(heuristics)
+
 
     def changeGateHeuristic(self, pos, goal):
         heuristics = []
@@ -258,7 +279,7 @@ class ReflexCaptureAgent(CaptureAgent):
             for successor in self.GetSuccessors(pos):
                 successor_state = successor[0]
                 successor_direction = successor[1]
-                successor_cost = cost + heuristic(successor_state, goal)
+                successor_cost = cost + 1
                 if successor_state not in visited or visited[successor_state] > successor_cost:
                     visited[successor_state] = successor_cost
                     successor_states = states + [successor_state]
@@ -425,21 +446,24 @@ class Negative(ReflexCaptureAgent):
         self.UpdateFoodList(gameState)
 
         if nearby_pacmans:
-            destination = nearby_pacmans[0].getPosition()
+            self.destination = nearby_pacmans[0].getPosition()
             if current_state.scaredTimer > 0:
                 for pacman in nearby_pacmans:
                     if self.getMazeDistance(current_position, pacman.getPosition()) <= 1:
-                        destination = self.start_position
-            return self.waStarSearch(destination, self.DetectOpponentGhostsHeuristic)
+                        self.destination = self.start_position
+            return self.waStarSearch(self.destination, self.DetectOpponentPacmansHeuristic)
+
         elif self.nearest_eaten_food is not None:
-            return self.waStarSearch(self.nearest_eaten_food, self.DetectOpponentGhostsHeuristic)
+            return self.waStarSearch(self.nearest_eaten_food, self.noCrossingHeuristic)
+
         elif self.destination is None:
             self.destination = nearest_mid_point
-            return self.waStarSearch(nearest_mid_point, self.DetectOpponentGhostsHeuristic)
+            return self.waStarSearch(nearest_mid_point, self.noCrossingHeuristic)
+
         elif current_position == self.destination:
             self.destination = furthest_mid_point
 
-        return self.waStarSearch(self.destination, self.DetectOpponentGhostsHeuristic)
+        return self.waStarSearch(self.destination, self.noCrossingHeuristic)
 
 
 class Friendly(ReflexCaptureAgent):
