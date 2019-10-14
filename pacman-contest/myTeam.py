@@ -48,7 +48,7 @@ class ReflexCaptureAgent(CaptureAgent):
             = self.opponents_index = None
         self.opt_reborn_poss = {}
         self.opt_init_pos = {}
-
+        self.mTerritory = {}
         self._instances.append(self)
 
     def InitLogger(self):
@@ -90,7 +90,6 @@ class ReflexCaptureAgent(CaptureAgent):
         self.eaten_foods = []
         self.eaten_foods_distance = []
         self.nearest_eaten_food = None
-
         self.opt_mid_points = []
         for y in range(0, self.layout_height):
             point = ((self.layout_width // 2) - (0 if self.red else 1), y)
@@ -119,7 +118,7 @@ class ReflexCaptureAgent(CaptureAgent):
             self.initStartPositionPossibility(idx)
 
         self.midX = gameState.data.layout.width // 2 - 1 if self.red else gameState.data.layout.width // 2
-
+        self.territory()
         # --------------------------------------------
 
     def initStartPositionPossibility(self, index):
@@ -127,6 +126,26 @@ class ReflexCaptureAgent(CaptureAgent):
         self.prePossiblePosition[index][self.opt_init_pos[index]] = 1
         for pos, _ in self.GetSuccessors(self.opt_init_pos[index]):
             self.prePossiblePosition[index][pos] = 1
+
+    def territory(self):
+        x0, _ = self.start_position
+        for pos in self.legalPosition:
+            x, _ = pos
+            # TODO check self.layout_width // 2
+            if abs(x - x0) < self.layout_width // 2 - 1:
+                self.mTerritory[pos] = True
+            else:
+                self.mTerritory[pos] = False
+
+    def isInvade(self, op_idx):
+        count = 0
+        for pos in self.distributions[op_idx].keys():
+            if self.distributions[op_idx][pos] != 0:
+                if self.mTerritory[pos]:
+                    count += self.distributions[op_idx][pos]
+                else:
+                    count -= self.distributions[op_idx][pos]
+        return True if count > 0 else False
 
     def GetNearbyOpponentPacmans(self, gameState):
         opponents = [gameState.getAgentState(opponent) for opponent in self.opponents_index]
@@ -193,12 +212,12 @@ class ReflexCaptureAgent(CaptureAgent):
         xy2 = goal
         return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
 
-    def noCrossingHeuristic(self,pos,goal):
+    def noCrossingHeuristic(self, pos, goal):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
-        (x,y) = pos
+        (x, y) = pos
         if (self.red and x > self.midX) or (not self.red and x < self.midX):
-            heuristics.append(999999)
+            heuristics.append(99)
         return max(heuristics)
 
     def DetectOpponentGhostsHeuristic(self, pos, goal):
@@ -206,10 +225,9 @@ class ReflexCaptureAgent(CaptureAgent):
         heuristics.append(self.manhattanHeuristic(pos, goal))
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
-            if self.getMazeDistance(pos, ghost.getPosition()) < 2:
-                heuristics.append(999999)
+            if self.getMazeDistance(pos, ghost.getPosition()) < 5:
+                heuristics.append(999)
         return max(heuristics)
-
 
     def DetectOpponentPacmansHeuristic(self, pos, goal):
         heuristics = []
@@ -220,12 +238,11 @@ class ReflexCaptureAgent(CaptureAgent):
                 heuristics.append(999999)
         return max(heuristics)
 
-
     def changeGateHeuristic(self, pos, goal):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
         if pos in self.opt_mid_points:
-            heuristics.append(999999)
+            heuristics.append(99)
         return max(heuristics)
 
     class Node:
@@ -456,7 +473,20 @@ class Negative(ReflexCaptureAgent):
         elif self.nearest_eaten_food is not None:
             return self.waStarSearch(self.nearest_eaten_food, self.noCrossingHeuristic)
 
-        elif self.destination is None:
+        else:
+            for op in self.opponents_index:
+                _min = 999
+                goal = current_position
+                if self.isInvade(op):
+                    for p in self.distributions[op].keys():
+                        if self.distributions[op][p] != 0 and p in self.mTerritory:
+                            dis = self.getMazeDistance(p, current_position)
+                            if dis < _min:
+                                goal = p
+                                _min = dis
+                if goal != current_position:
+                    return self.waStarSearch(goal, self.noCrossingHeuristic)
+        if self.destination is None:
             self.destination = nearest_mid_point
             return self.waStarSearch(nearest_mid_point, self.noCrossingHeuristic)
 
@@ -471,16 +501,23 @@ class Friendly(ReflexCaptureAgent):
         ReflexCaptureAgent.__init__(self, gameState)
         self.mTerritory = {}
         self.invincible_state = (False, 0)
+        self.entrance = []
 
     def registerInitialState(self, gameState):
         ReflexCaptureAgent.registerInitialState(self, gameState)
         self.territory()
+        for x, y in self.mid_points:
+            op_x = x + 1 if self.red else x - 1
+            if (op_x, y) in self.opt_mid_points:
+                self.entrance.append((x, y))
+
         self.weight_gate = util.Counter()
-        for pos in self.mid_points:
+        for pos in self.entrance:
             self.weight_gate[pos] = 1
 
         roadEnd = []
         self.lane = {}
+        self.lane_end_start={}
         for pos in self.legalPosition:
             l = len(self.GetSuccessors(pos))
             if l == 1:
@@ -489,17 +526,29 @@ class Friendly(ReflexCaptureAgent):
             road = [p]
             while True:
                 succ = self.GetSuccessors(road[-1])
-                if len(succ)>2:
+                if len(succ) > 2:
                     break
                 else:
                     for i in succ:
                         if i[0] not in road:
                             road.append(i[0])
-            self.lane[road[-1]]=road
+            self.lane[p] = road
+            self.lane_end_start[p]=road[-1]
 
-        print(self.lane)
+        # print(self.lane)
 
+        # print(self.lane_food)
 
+    def update_lane_food(self):
+        self.lane_food = {}
+        gameState = self.getCurrentObservation()
+        pos = gameState.getAgentState(self.index).getPosition()
+        remaining_foods = [food for food in self.getFood(gameState).asList()]
+        for f in remaining_foods:
+            self.lane_food[f] = 0
+            for lane in self.lane.keys():
+                if f in self.lane[lane]:
+                    self.lane_food[f] = max(self.getMazeDistance(f, self.lane_end_start[lane]),self.lane_food[f])
 
     def territory(self):
         x0, _ = self.start_position
@@ -532,7 +581,7 @@ class Friendly(ReflexCaptureAgent):
                 _min = min(_min, dist)
             return _min
 
-        for pos in self.mid_points:
+        for pos in self.entrance:
             d = cal_nearest_food(pos)
             gate[pos] = d
             _max = max(_max, d)
@@ -542,102 +591,28 @@ class Friendly(ReflexCaptureAgent):
         return gate
 
     def chooseAction(self, gameState):
+
         def show_lane():
             showLane = util.Counter()
             for i in self.lane.keys():
                 for p in self.lane[i]:
                     showLane[p] = 1
             self.displayDistributionsOverPositions([showLane])
-        def canSurvive():
-            exitPath = self.waStarSearchFullPath(nearest_mid_point, self.DetectOpponentGhostsHeuristic)
-            # print(exitPath)
-            _keyPos = cur_pos
-            delta = 0
-            for op_idx in self.opponents_index:
-                _min = 999
-                for epPos in exitPath:
-                    for enemyP in [k for k in self.distributions[op_idx].keys() if self.distributions[op_idx][k] > 0]:
-                        if _min > self.getMazeDistance(epPos, enemyP):
-                            _min = self.getMazeDistance(epPos, enemyP)
-                            _keyPos = epPos
-                if self.getMazeDistance(_keyPos, cur_pos) > _min:  # calculate probability
-                    delta = self.getMazeDistance(_keyPos, cur_pos) - _min
-                    return False, len(exitPath), delta
-            return True, len(exitPath), delta
 
-        cur_pos = gameState.getAgentState(self.index).getPosition()
-        mid_distances = [self.getMazeDistance(cur_pos, mid_point) for mid_point in self.mid_points]
-        nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
-        nearest_capsule = self.GetNearestCapsule(gameState)
-        nearest_food = self.GetNearestFood(gameState)
-        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
-        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
-        capsules = self.getCapsules(self.getPreviousObservation() if self.getPreviousObservation() else gameState)
-        carry_points = self.getCurrentObservation().getAgentState(self.index).numCarrying
+        def show_legalpos():
+            show_lp = util.Counter()
+            for i in self.food_list:
+                show_lp[i] = 1
+            self.displayDistributionsOverPositions([show_lp])
 
-        self.displayDistributionsOverPositions(self.updateDistribution())
-        _canSurvive, exitPathLen, delta_step = canSurvive()
-
-        # print(self.isInvade(self.opponents_index[0]))
-
-        def evalution():
-            nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
-            if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
-                                                                                             certainFood()) >= 2:
-                return 'escape', bestExit()
-            if not _canSurvive and nearby_ghosts == [] and delta_step <= 2:
-                return 'escape', bestExit()
-            if nearby_ghosts:
-                isInv, leftTime = self.invincible_state
-                d = []
-                chase = []
-                for g in nearby_ghosts:
-                    dis = self.getMazeDistance(cur_pos, g.getPosition())
-                    d.append(dis)
-                    if isInv and g.scaredTimer > dis and self.getMazeDistance(nearest_food, cur_pos) > 3:
-                        chase.append((g.getPosition(), dis))
-
-                if chase != []:
-                    chase.sort(key=lambda x: x[1])
-                    return 'chase', chase[0][0]
-                elif isInv:
-                    return 'eat_more', nearest_food
-                else:
-                    # TODO
-                    if min(d) >= 6:
-                        return 'eat_more', certainFood()
-                    if 5 < min(d) < 8:
-                        return 'sneak', certainFood()
-                return 'escape', bestExit()
-
-            if min(eval_dist()) >= 8:
-                return 'eat_more', nearest_food
-            if 5 == min(eval_dist()):
-                return 'sneak', sneakPosition()
-
-            return 'eat_more', nearest_food
-
-        def eval_dist():
-            dists = []
-            cur_position = self.getCurrentObservation().getAgentState(self.index).getPosition()
-
-            def nPP(idx):
-                curMin = 9999
-                distribution = self.distributions[idx]
-                for pos in distribution.keys():
-                    if distribution[pos] != 0:
-                        curMin = min(self.getMazeDistance(cur_position, pos), curMin)
-                return curMin
-
-            for i in self.opponents_index:
-                dists.append(nPP(i))
-            return dists
+        # show_legalpos()
+        # show_lane()
 
         def bestExit():
             markedExit = []
             best = None
             _min = 999
-            for pos in self.mid_points:
+            for pos in self.entrance:
                 flag = True
                 for op in self.opponents_index:
                     distri = self.distributions[op]
@@ -654,9 +629,130 @@ class Friendly(ReflexCaptureAgent):
                 if dist < _min:
                     best = pos
             if best is not None:
+                # print(best)
                 return best
             else:
                 return nearest_capsule
+
+        def canSurvive():
+            exitPath = self.waStarSearchFullPath(bestExit(), self.DetectOpponentGhostsHeuristic)
+            # print(exitPath)
+            _keyPos = cur_pos
+            delta = 0
+            for op_idx in self.opponents_index:
+                _min = 999
+                for epPos in exitPath:
+                    for enemyP in [k for k in self.distributions[op_idx].keys() if self.distributions[op_idx][k] > 0]:
+                        if _min > self.getMazeDistance(epPos, enemyP):
+                            _min = self.getMazeDistance(epPos, enemyP)
+                            _keyPos = epPos
+                if self.getMazeDistance(_keyPos, cur_pos) > _min:  # calculate probability
+                    delta = self.getMazeDistance(_keyPos, cur_pos) - _min
+                    return False, len(exitPath), delta
+            return True, len(exitPath), delta
+
+        cur_pos = gameState.getAgentState(self.index).getPosition()
+        # mid_distances = [self.getMazeDistance(cur_pos, mid_point) for mid_point in self.mid_points]
+        # nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
+        nearest_capsule = self.GetNearestCapsule(gameState)
+        nearest_food = self.GetNearestFood(gameState)
+        nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+        nearby_pacmans = self.GetNearbyOpponentPacmans(gameState)
+        capsules = self.getCapsules(self.getPreviousObservation() if self.getPreviousObservation() else gameState)
+        carry_points = self.getCurrentObservation().getAgentState(self.index).numCarrying
+
+        cur_food = {}
+        for f in [food for food in self.getFood(gameState).asList()]:
+            cur_food[f] = self.getMazeDistance(f, cur_pos)
+
+        self.update_lane_food()
+        # self.displayDistributionsOverPositions(self.updateDistribution())
+
+        _canSurvive, exitPathLen, delta_step = canSurvive()
+
+        # print(self.isInvade(self.opponents_index[0]))
+        def isLaneFood(f):
+            return True if f in self.lane_food.keys() else False
+
+        def cost_lane_food(f, curP):
+            return self.getMazeDistance(f, curP) + self.lane_food[f]
+
+        def evalution():
+            nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
+            if self.getCurrentObservation().data.timeleft <= 5 + self.getMazeDistance(cur_pos, bestExit()):
+                return 'escape', bestExit()
+            # if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
+            #                                                                                  certainFood()) >= 2:
+            #     return 'escape', bestExit()
+            # if not _canSurvive and nearby_ghosts == [] and delta_step <= 2:
+            #     return 'escape', bestExit()
+            if nearby_ghosts:
+                isInv, leftTime = self.invincible_state
+                d = []
+                chase = []
+                for g in nearby_ghosts:
+                    dis = self.getMazeDistance(cur_pos, g.getPosition())
+                    d.append(dis)
+                    # if isInv and g.scaredTimer > dis and self.getMazeDistance(nearest_food, cur_pos) > 3:
+                    #     chase.append((g.getPosition(), dis))
+
+                # if chase != []:
+                #     chase.sort(key=lambda x: x[1])
+                #     return 'chase', chase[0][0]
+                if isInv:
+                    for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
+                        can_eat = True
+                        for g in nearby_ghosts:
+                            if isLaneFood(f):
+                                if g.scaredTimer <= cost_lane_food(f, cur_pos):
+                                    can_eat = False
+                        if can_eat:
+                            return "eat_more", f
+
+                    return 'escape', bestExit()
+                else:
+                    if self.getMazeDistance(g.getPosition(),cur_pos)==1:
+                        return 'escape', bestExit()
+                    for f, _ in sorted(cur_food.items(), key=lambda x: x[1]):
+                        can_eat = True
+                        for g in nearby_ghosts:
+                            if isLaneFood(f):
+                                for lane in self.lane.keys():
+                                    if f in self.lane[lane]:
+                                        entrance = self.lane_end_start[lane]
+                                if self.getMazeDistance(g.getPosition(), entrance) + 1 <= cost_lane_food(f, cur_pos):
+                                    can_eat = False
+                        if can_eat:
+                            return "eat_more", f
+                    return 'escape', bestExit()
+
+            # if _canSurvive and carry_points / (exitPathLen + 1) > 1 and self.getMazeDistance(cur_pos,
+            #                                                                                  certainFood()) >= 2:
+            #     return 'escape', bestExit()
+            if not _canSurvive and nearby_ghosts == [] and delta_step <= 2:
+                return 'escape', bestExit()
+            # if min(eval_dist()) >= 8:
+            #     return 'eat_more', nearest_food
+            # if 5 == min(eval_dist()):
+            #     return 'sneak', sneakPosition()
+
+            return 'eat_more', certainFood()
+
+        def eval_dist():
+            dists = []
+            cur_position = self.getCurrentObservation().getAgentState(self.index).getPosition()
+
+            def nPP(idx):
+                curMin = 9999
+                distribution = self.distributions[idx]
+                for pos in distribution.keys():
+                    if distribution[pos] != 0:
+                        curMin = min(self.getMazeDistance(cur_position, pos), curMin)
+                return curMin
+
+            for i in self.opponents_index:
+                dists.append(nPP(i))
+            return dists
 
         def sneakPosition():
             for op in [self.pre_op_idx, self.next_op_idx]:
@@ -686,7 +782,8 @@ class Friendly(ReflexCaptureAgent):
                 isRisky = False
                 for op in self.opponents_index:
                     for pos in self.distributions[op].keys():
-                        if util.manhattanDistance(pos, f) < 4 * self.distributions[op][pos]:
+                        if self.distributions[op][pos] != 0 and self.getMazeDistance(pos, f) < 5 * \
+                                self.distributions[op][pos]:
                             isRisky = True
                 if not isRisky:
                     accessible_food.append(f)
@@ -712,7 +809,7 @@ class Friendly(ReflexCaptureAgent):
                     for p in [k for k in self.distributions[op].keys() if self.distributions[op][k] != 0]:
                         if self.getMazeDistance(pos, p) <= 5 * self.distributions[op][p]:
                             flag = False
-                            self.weight_gate[pos] -= 1
+                            self.weight_gate[pos] -= 5
                             break
                 if flag:
                     candidate[pos] = gate[pos]
@@ -721,12 +818,35 @@ class Friendly(ReflexCaptureAgent):
             # self.weight_gate.normalize()
             for p in candidate.keys():
                 candidate[p] *= self.weight_gate[p]
-            print(candidate)
-            return sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
+            c_gate = sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
+            print(c_gate)
+            return c_gate if c_gate is not None else cur_pos
+
+        def pickAGate2():
+            gate = {}
+            self.weight_gate.incrementAll(self.weight_gate.keys(), 1)
+            for pos in self.entrance:
+                for op in self.opponents_index:
+                    f = True
+                    opp = self.getCurrentObservation().getAgentState(op).getPosition()
+                    if opp is not None and self.getMazeDistance(pos, opp) <= 6:
+                        f = False
+                        self.weight_gate[pos] -= 5
+                if f:
+                    gate[pos] = self.getMazeDistance(pos, cur_pos)
+            _list = sorted(gate.items(), key=lambda x: x[1])
+            if _list is not None:
+                print(_list[0][0])
+                return _list[0][0]
+            else:
+                return cur_pos
 
         picked_gate = pickAGate()
-        if self.mTerritory[cur_pos] and cur_pos != picked_gate:
-            return self.waStarSearch(picked_gate, self.DetectOpponentGhostsHeuristic)
+        if self.mTerritory[cur_pos]:
+            if cur_pos != picked_gate:
+                return self.waStarSearch(picked_gate, self.noCrossingHeuristic)
+            else:
+                return self.waStarSearch(certainFood(), self.DetectOpponentGhostsHeuristic)
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
