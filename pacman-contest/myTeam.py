@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Positive'):
+def createTeam(firstIndex, secondIndex, isRed, first='Negative', second='Friendly'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -204,7 +204,7 @@ class ReflexCaptureAgent(CaptureAgent):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
         if pos in self.opt_mid_points:
-            heuristics.append(999999)
+            heuristics.append(99)
         return max(heuristics)
 
     class Node:
@@ -688,7 +688,7 @@ class Friendly(ReflexCaptureAgent):
                     for p in [k for k in self.distributions[op].keys() if self.distributions[op][k] != 0]:
                         if self.getMazeDistance(pos, p) <= 5 * self.distributions[op][p]:
                             flag = False
-                            self.weight_gate[pos] -= 1
+                            self.weight_gate[pos] -= 5
                             break
                 if flag:
                     candidate[pos] = gate[pos]
@@ -702,7 +702,7 @@ class Friendly(ReflexCaptureAgent):
 
         picked_gate = pickAGate()
         if self.mTerritory[cur_pos] and cur_pos != picked_gate:
-            return self.waStarSearch(picked_gate, self.DetectOpponentGhostsHeuristic)
+            return self.waStarSearch(picked_gate, self.changeGateHeuristic)
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
