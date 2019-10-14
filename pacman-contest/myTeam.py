@@ -666,7 +666,7 @@ class Friendly(ReflexCaptureAgent):
             cur_food[f] = self.getMazeDistance(f, cur_pos)
 
         self.update_lane_food()
-        # self.displayDistributionsOverPositions(self.updateDistribution())
+        self.displayDistributionsOverPositions(self.updateDistribution())
 
         _canSurvive, exitPathLen, delta_step = canSurvive()
 
