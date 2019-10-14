@@ -193,12 +193,12 @@ class ReflexCaptureAgent(CaptureAgent):
         xy2 = goal
         return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
 
-    def noCrossingHeuristic(self,pos,goal):
+    def noCrossingHeuristic(self, pos, goal):
         heuristics = []
         heuristics.append(self.manhattanHeuristic(pos, goal))
-        (x,y) = pos
+        (x, y) = pos
         if (self.red and x > self.midX) or (not self.red and x < self.midX):
-            heuristics.append(999999)
+            heuristics.append(99)
         return max(heuristics)
 
     def DetectOpponentGhostsHeuristic(self, pos, goal):
@@ -207,9 +207,8 @@ class ReflexCaptureAgent(CaptureAgent):
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
             if self.getMazeDistance(pos, ghost.getPosition()) < 2:
-                heuristics.append(999999)
+                heuristics.append(999)
         return max(heuristics)
-
 
     def DetectOpponentPacmansHeuristic(self, pos, goal):
         heuristics = []
@@ -219,7 +218,6 @@ class ReflexCaptureAgent(CaptureAgent):
             if self.getMazeDistance(pos, pacman.getPosition()) < 2:
                 heuristics.append(999999)
         return max(heuristics)
-
 
     def changeGateHeuristic(self, pos, goal):
         heuristics = []
@@ -489,17 +487,15 @@ class Friendly(ReflexCaptureAgent):
             road = [p]
             while True:
                 succ = self.GetSuccessors(road[-1])
-                if len(succ)>2:
+                if len(succ) > 2:
                     break
                 else:
                     for i in succ:
                         if i[0] not in road:
                             road.append(i[0])
-            self.lane[road[-1]]=road
+            self.lane[road[-1]] = road
 
         print(self.lane)
-
-
 
     def territory(self):
         x0, _ = self.start_position
@@ -548,6 +544,7 @@ class Friendly(ReflexCaptureAgent):
                 for p in self.lane[i]:
                     showLane[p] = 1
             self.displayDistributionsOverPositions([showLane])
+
         def canSurvive():
             exitPath = self.waStarSearchFullPath(nearest_mid_point, self.DetectOpponentGhostsHeuristic)
             # print(exitPath)
@@ -612,10 +609,10 @@ class Friendly(ReflexCaptureAgent):
 
             if min(eval_dist()) >= 8:
                 return 'eat_more', nearest_food
-            if 5 == min(eval_dist()):
-                return 'sneak', sneakPosition()
+            # if 5 == min(eval_dist()):
+            #     return 'sneak', sneakPosition()
 
-            return 'eat_more', nearest_food
+            return 'eat_more', certainFood()
 
         def eval_dist():
             dists = []
@@ -686,7 +683,8 @@ class Friendly(ReflexCaptureAgent):
                 isRisky = False
                 for op in self.opponents_index:
                     for pos in self.distributions[op].keys():
-                        if util.manhattanDistance(pos, f) < 4 * self.distributions[op][pos]:
+                        if self.distributions[op][pos] != 0 and self.getMazeDistance(pos, f) < 5 * \
+                                self.distributions[op][pos]:
                             isRisky = True
                 if not isRisky:
                     accessible_food.append(f)
@@ -724,9 +722,28 @@ class Friendly(ReflexCaptureAgent):
             print(candidate)
             return sorted(candidate.items(), key=lambda x: x[1], reverse=True)[0][0]
 
+        def pickAGate2():
+            gate = {}
+            self.weight_gate.incrementAll(self.weight_gate.keys(), 1)
+            for pos in self.mid_points:
+                for op in self.opponents_index:
+                    f = True
+                    opp = self.getCurrentObservation().getAgentState(op).getPosition()
+                    if opp is not None and self.getMazeDistance(pos, opp) <= 6:
+                        f = False
+                        self.weight_gate[pos] -= 5
+                if f:
+                    gate[pos] = self.getMazeDistance(pos, cur_pos)
+            _list = sorted(gate.items(), key=lambda x: x[1])
+            if _list is not None:
+                print(_list[0][0])
+                return _list[0][0]
+            else:
+                return cur_pos
+
         picked_gate = pickAGate()
         if self.mTerritory[cur_pos] and cur_pos != picked_gate:
-            return self.waStarSearch(picked_gate, self.changeGateHeuristic)
+            return self.waStarSearch(picked_gate, self.noCrossingHeuristic)
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
