@@ -131,7 +131,7 @@ class ReflexCaptureAgent(CaptureAgent):
         for pos in self.legalPosition:
             x, _ = pos
             # TODO check self.layout_width // 2
-            if (self.red and x < self.midX) or (not self.red and x > self.midX):
+            if (self.red and x <= self.midX) or (not self.red and x >= self.midX):
                 self.mTerritory[pos] = True
             else:
                 self.mTerritory[pos] = False
