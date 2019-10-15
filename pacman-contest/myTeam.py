@@ -768,7 +768,7 @@ class Friendly(ReflexCaptureAgent):
                         can_eat = False
                 if can_eat:
                     return "eat_more", f
-                if carry_points > 5 and self.getMazeDistance(bestExit(), cur_pos) <= self.getMazeDistance(f, cur_pos):
+                if carry_points >= 2 and self.getMazeDistance(bestExit(), cur_pos) <= self.getMazeDistance(f, cur_pos):
                     return 'escape', bestExit()
 
             return 'escape', bestExit()
