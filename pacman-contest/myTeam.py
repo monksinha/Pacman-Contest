@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
+def createTeam(firstIndex, secondIndex, isRed, first='Friendly', second='Negative'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -226,7 +226,7 @@ class ReflexCaptureAgent(CaptureAgent):
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
             if self.getMazeDistance(pos, ghost.getPosition()) < 5:
-                heuristics.append(999)
+                heuristics.append(999999)
         return max(heuristics)
 
     def DetectOpponentPacmansHeuristic(self, pos, goal):
@@ -563,11 +563,11 @@ class Friendly(ReflexCaptureAgent):
                     self.lane_food[f] = max(self.getMazeDistance(f, self.lane_end_start[lane]), self.lane_food[f])
 
     def territory(self):
-        x0, _ = self.start_position
+
         for pos in self.legalPosition:
             x, _ = pos
             # TODO check self.layout_width // 2
-            if abs(x - x0) < self.layout_width // 2 - 1:
+            if x <= self.midX:
                 self.mTerritory[pos] = True
             else:
                 self.mTerritory[pos] = False
@@ -708,9 +708,12 @@ class Friendly(ReflexCaptureAgent):
                 isInv, leftTime = self.invincible_state
                 dists = []
                 chase = []
+                scared =[]
                 for g in nearby_ghosts:
                     dis = self.getMazeDistance(cur_pos, g.getPosition())
                     dists.append(dis)
+                    if g.scaredTimer==0:
+                        scared.append(False)
                     # if isInv and g.scaredTimer > dis and self.getMazeDistance(nearest_food, cur_pos) > 3:
                     #     chase.append((g.getPosition(), dis))
 
@@ -725,7 +728,7 @@ class Friendly(ReflexCaptureAgent):
                             if isLaneFood(f):
                                 if g.scaredTimer <= cost_lane_food(f, cur_pos):
                                     can_eat = False
-                        if can_eat:
+                        if can_eat and False not in scared:
                             return "eat_more", f
 
                     return 'escape', bestExit()
@@ -863,7 +866,6 @@ class Friendly(ReflexCaptureAgent):
             for p in candidate.keys():
                 candidate[p] *= self.weight_gate[p]
             c_gate = sorted(candidate.items(), key=lambda x: x[1], reverse=True)
-            print(c_gate)
             if len(c_gate)!=0 and len(c_gate[0])!= 0:
                 return c_gate[0][0]
             else:
@@ -898,7 +900,7 @@ class Friendly(ReflexCaptureAgent):
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
-
+        print(strategy,goal)
         if strategy == 'eat_more':
             return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic)
         if strategy == 'escape':
