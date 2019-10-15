@@ -221,11 +221,24 @@ class ReflexCaptureAgent(CaptureAgent):
 
     def DetectOpponentGhostsHeuristic(self, pos, goal):
         heuristics = []
-        heuristics.append(self.manhattanHeuristic(pos, goal))
+        heuristics.append(0)
+        # heuristics.append(self.manhattanHeuristic(pos, goal))
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
-            if self.getMazeDistance(pos, ghost.getPosition()) < 5:
-                heuristics.append(999999)
+            dist =self.getMazeDistance(pos, ghost.getPosition())
+            if dist < 2:
+                heuristics.append((3-dist)*2000)
+        return max(heuristics)
+
+    def DetectOpponentGhostsHeuristic2(self, pos, goal):
+        heuristics = []
+        heuristics.append(0)
+        # heuristics.append(self.manhattanHeuristic(pos, goal))
+        ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
+        for ghost in ghosts:
+            dist =self.getMazeDistance(pos, ghost.getPosition())
+            if dist < 6:
+                heuristics.append((10-dist)*2000)
         return max(heuristics)
 
     def DetectOpponentPacmansHeuristic(self, pos, goal):
@@ -638,6 +651,7 @@ class Friendly(ReflexCaptureAgent):
             for pos in markedExit:
                 dist = self.getMazeDistance(pos, cur_pos)
                 if dist < _min:
+                    _min=dist
                     best = pos
             if best is not None:
                 # print(best)
@@ -809,7 +823,7 @@ class Friendly(ReflexCaptureAgent):
                     remaining_foods = self.getFood(gameState).asList()
                     if remaining_foods != []:
                         for f in remaining_foods:
-                            _dic[f] = self.getMazeDistance(f, cur_pos)
+                            _dic[f] = self.getMazeDistance(f, cur_pos)+ len(self.waStarSearchFullPath(f,self.DetectOpponentGhostsHeuristic))
                         _list = sorted(_dic.items(), key=lambda x: x[1])
                         return _list[0][0]
                     else:
@@ -888,12 +902,35 @@ class Friendly(ReflexCaptureAgent):
             else:
                 return cur_pos
 
-        picked_gate = pickAGate()
-        if self.mTerritory[cur_pos]:
-            if cur_pos != picked_gate:
-                return self.waStarSearch(picked_gate, self.noCrossingHeuristic)
+        def next_food():
+            _min=999
+            _list=[]
+            best_food=nearest_food
+            if best_food is not None:
+                for food in self.opponent_food_list:
+                    _len = len(self.waStarSearchFullPath(food,self.DetectOpponentGhostsHeuristic))
+                    if _len<_min:
+                        _min=_len
+                        best_food = food
+                return best_food
             else:
-                return self.waStarSearch(certainFood(), self.DetectOpponentGhostsHeuristic)
+                return cur_pos
+        # picked_gate = pickAGate()
+
+
+        # if self.mTerritory[cur_pos]:
+        #     if cur_pos != picked_gate:
+        #         return self.waStarSearch(picked_gate, self.noCrossingHeuristic)
+        #     else:
+        #         return self.waStarSearch(certainFood(), self.DetectOpponentGhostsHeuristic)
+        if self.mTerritory[cur_pos] and cur_pos in self.mid_points:
+            goal = certainFood()
+            return self.waStarSearch(goal, self.DetectOpponentGhostsHeuristic2)
+
+        if self.mTerritory[cur_pos] and cur_pos not in self.mid_points:
+            goal = certainFood()
+            return self.waStarSearch(goal, self.manhattanHeuristic)
+
         strategy, goal = evalution()
         update_Invincible()
         # print(self.invincible_state)
