@@ -25,7 +25,7 @@ MIN_CARRYING = 2
 # Team creation #
 #################
 
-def createTeam(firstIndex, secondIndex, isRed, first='Friendly', second='Negative'):
+def createTeam(firstIndex, secondIndex, isRed, first='Positive', second='Negative'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 
@@ -128,11 +128,10 @@ class ReflexCaptureAgent(CaptureAgent):
             self.prePossiblePosition[index][pos] = 1
 
     def territory(self):
-        x0, _ = self.start_position
         for pos in self.legalPosition:
             x, _ = pos
             # TODO check self.layout_width // 2
-            if abs(x - x0) < self.layout_width // 2 - 1:
+            if (self.red and x < self.midX) or (not self.red and x > self.midX):
                 self.mTerritory[pos] = True
             else:
                 self.mTerritory[pos] = False
@@ -217,7 +216,7 @@ class ReflexCaptureAgent(CaptureAgent):
         heuristics.append(self.manhattanHeuristic(pos, goal))
         (x, y) = pos
         if (self.red and x > self.midX) or (not self.red and x < self.midX):
-            heuristics.append(999)
+            heuristics.append(999999)
         return max(heuristics)
 
     def DetectOpponentGhostsHeuristic(self, pos, goal):
@@ -226,7 +225,7 @@ class ReflexCaptureAgent(CaptureAgent):
         ghosts = self.GetNearbyOpponentGhosts(self.getCurrentObservation())
         for ghost in ghosts:
             if self.getMazeDistance(pos, ghost.getPosition()) < 5:
-                heuristics.append(999)
+                heuristics.append(999999)
         return max(heuristics)
 
     def DetectOpponentPacmansHeuristic(self, pos, goal):
@@ -494,6 +493,7 @@ class Negative(ReflexCaptureAgent):
                                 _min = dis
                 if goal != current_position:
                     return self.waStarSearch(goal, self.noCrossingHeuristic)
+
         if self.destination is None:
             self.destination = nearest_mid_point
             return self.waStarSearch(nearest_mid_point, self.noCrossingHeuristic)
