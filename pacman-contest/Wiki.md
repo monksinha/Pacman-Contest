@@ -246,7 +246,7 @@ From some game replays, we find out that in those games we lose, the main reason
 | MCTS              | Result 1     | Result 2        | Result 3     | Result 4   | Result 5  |
 |-----------------  |:-------------|:--------------- |:-------------|:-----------|:----------|
 | Game Date Time    |9 Oct 16:00   |9 Oct 18:00      |9 Oct 20:00   |9 Oct 22:00 |10 Oct 8:00 |   
-| staff_team_basic  | Win          | Tie             | Lose         | Tie        |  Tie       |
+| staff_team_basic  | Tie          | Win             | Lose         | Tie        |  Tie       |
 | staff_team_medium | Lose         | Lose            | Lose         | Lose       |  Tie       |
 | staff_team_top    | Lose         | Lose            | Lose         | Lose       |  Tie       |
 | staff_team_super  | Lose         | Lose            | Lose         | Lose       |  Tie       |
@@ -269,13 +269,13 @@ Currently, one of our agents is responsible for eating food on the far side, the
 It turns out that our two agents are acting on their own without considering the state of the other team agent. It might be better if we can let the two agents working as a group rather than as individuals.
 
 ## Technique Specific Improvements
-### A* Heuristic Search
+#### A* Heuristic Search
 1. Improve the selection of entry points for both attacker and defender to avoid deadlock.
 2. Our current agent does not consider eating capsule proactively, as we do not know if it is worth giving priority to capsule over food. We need to think further about the logic of eating capsule.
 3. Consider other suitable heuristics.
 4. Add more condition judgement.
 
-### Monte Carlo Tree Search
+#### Monte Carlo Tree Search
 1. Redesign the weights and features or use other ways to evaluate rewards
 2. Add in the simulation of the opponent's actions
 3. Reuse the built search tree if possible so that we can make better use of limited computation time.
