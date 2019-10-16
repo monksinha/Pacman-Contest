@@ -642,7 +642,7 @@ class Friendly(ReflexCaptureAgent):
                     distri = self.distributions[op]
                     for enemyPos in distri.keys():
                         if distri[enemyPos] != 0:
-                            if self.getMazeDistance(pos, enemyPos) <= 5 * distri[enemyPos] \
+                            if self.getMazeDistance(pos, enemyPos) <= 2 * distri[enemyPos] \
                                     and self.getMazeDistance(enemyPos, pos) < self.getMazeDistance(cur_pos, pos):
                                 flag = False
                                 break
@@ -656,8 +656,10 @@ class Friendly(ReflexCaptureAgent):
             if best is not None:
                 # print(best)
                 return best
-            else:
+            elif nearest_capsule is not None:
                 return nearest_capsule
+            else:
+                return nearest_mid_point
 
         def canSurvive():
             exitPath = self.waStarSearchFullPath(bestExit(), self.DetectOpponentGhostsHeuristic)
@@ -677,8 +679,8 @@ class Friendly(ReflexCaptureAgent):
             return True, len(exitPath), delta
 
         cur_pos = gameState.getAgentState(self.index).getPosition()
-        # mid_distances = [self.getMazeDistance(cur_pos, mid_point) for mid_point in self.mid_points]
-        # nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
+        mid_distances = [self.getMazeDistance(cur_pos, mid_point) for mid_point in self.mid_points]
+        nearest_mid_point = self.GetNearestObject(self.mid_points, mid_distances)
         nearest_capsule = self.GetNearestCapsule(gameState)
         nearest_food = self.GetNearestFood(gameState)
         nearby_ghosts = self.GetNearbyOpponentGhosts(gameState)
