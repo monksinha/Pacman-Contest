@@ -1,5 +1,6 @@
 # UoM COMP90054 Contest Project
-![Semantic description of image](http://ai.berkeley.edu/projects/release/contest/v1/002/capture_the_flag.png) *The Project is based on 'Contest: Pacman Capture the Flag', from http://ai.berkeley.edu/contest.html*
+![Semantic description of image](http://ai.berkeley.edu/projects/release/contest/v1/002/capture_the_flag.png)  
+*The Project is based on 'Contest: Pacman Capture the Flag', from http://ai.berkeley.edu/contest.html*
 # Table of Contents
 - 1 &nbsp; Introduction
 - 2 &nbsp; Game Analysis
