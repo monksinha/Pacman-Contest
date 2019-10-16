@@ -2,17 +2,18 @@
 ![Semantic description of image](http://ai.berkeley.edu/projects/release/contest/v1/002/capture_the_flag.png)  
 *The Project is based on 'Contest: Pacman Capture the Flag', from http://ai.berkeley.edu/contest.html*
 # Table of Contents
-- 1 &nbsp; Introduction
-- 2 &nbsp; Game Analysis
-    - 2.1 &nbsp; Basics
-    - 2.2 &nbsp; Estimate Enemies Position
+- 1 &nbsp; Youtube Presentation
+- 2 &nbsp; Introduction
+- 3 &nbsp; Game Analysis
+    - 3.1 &nbsp; Basics
+    - 3.2 &nbsp; Estimate Enemies Position
     - 3.3 &nbsp; Determine Blind Alley (Dead End)
-- 3 &nbsp; Design and Challenges
-    - 3.1 &nbsp; Choices of Techniques
-    - 3.2 &nbsp; A* Heuristic Search
-    - 3.3 &nbsp; Monte Carlo Tree Search
-- 4 &nbsp; Experiments and Approach Evaluation
-- 5 &nbsp; Improvements and Reflections
+- 4 &nbsp; Design and Challenges
+    - 4.1 &nbsp; Choices of Techniques
+    - 4.2 &nbsp; A* Heuristic Search
+    - 4.3 &nbsp; Monte Carlo Tree Search
+- 5 &nbsp; Experiments and Approach Evaluation
+- 6 &nbsp; Improvements and Reflections
 
 
 
@@ -25,18 +26,18 @@
 
 **Important Note**: In the project repository, **myTeam.py** is for A* algorithm, **myTeam2.py** is for MCTS algorithm.
 
-# 0. Youtube presentation
+# 1. Youtube presentation
 Video Link: https://youtu.be/IrAce-rT7-Y
 
 Or Click <a href= "https://youtu.be/IrAce-rT7-Y"> Here </a> For the video
 
-# 1. Introduction
+# 2. Introduction
 The goal of this project is to implement two autonomous agents which collaborate and try to eat the food in the opponent's territory while defending the food on our own side. See [UC Berkely CS188](http://ai.berkeley.edu/contest.html) for detailed specification of this project.
 
 
-# 2. Game Analysis
+# 3. Game Analysis
 As we started this project, we discussed some important aspects that could affect our designs and implementations.
-## 2.1 Basics
+## 3.1 Basics
 1. The state-space can be very large, as some map layout consists of hundreds of grid cells.
 2. Actions are deterministic, i.e., when the agent follows the algorithm to move towards a direction, it will not deviate from that direction.
 3. The environment (game state) can be observed by agent, but with some noises (probabilistic).
@@ -44,7 +45,7 @@ As we started this project, we discussed some important aspects that could affec
 5. It is an adversarial game, which means that when choosing actions for our agents, we need to consider the state of the opponent's agents.
 
 
-## 2.2 Estimate Enemies Position 
+## 3.2 Estimate Enemies Position 
 
 #### Assumption
 
@@ -67,7 +68,7 @@ What can we do more based on this idea? Now we only use current and previous one
 
 To better estimate enemies' positions, we could have another prior distribution(currently, we use uniform distribution), such as beta distribution which is conjugate prior to help us analyse whether the enemy is chasing us.
 
-## 2.3 Determine Blind Alley
+## 3.3 Determine Blind Alley
 
 First thing first, in theory, this thing won't bother us if we use a Monte Carlo Tree Search as long as we simulate steps more than twice of the depth of alley and we would get back to the entrance at the right time. However, that takes huge computing resources and is impractical in our case due to limited computing time and hardware. Now, let's cut to the chase.
 
@@ -94,8 +95,8 @@ Once we are in a cycle, we can run a circle around our enemies without being eat
 - The blind alleys we calculate aren't fully correct, we didn't deal with the fork situation which means our entrance could be part of a blind alley.
 
 
-# 3 Design and Challenges
-## 3.1 Choices of Techniques
+# 4 Design and Challenges
+## 4.1 Choices of Techniques
 For the candidate techniques, we analysed that:
 1. Heuristic Search suits large state-space model and requires low computation time. In addition, we have already implemented some search algorithms in Project 1, it seems reasonable to start our design using a heuristic search.
 2. Implementing Classical Planning (PDDL) seems to be hard, and we would have to spend extra time familiarizing ourself with writing PDDL predicate if we choose this technique.
@@ -106,10 +107,10 @@ For the candidate techniques, we analysed that:
 
 Given the above considerations, we decided to implement **A\* Heuristic Search** and **Monte Carlo Tree Search** for the project.
   
-## 3.2 A* Heuristic Search
+## 4.2 A* Heuristic Search
 #### 'Friendly' Agent
 
-This agent is implemented based on section 2, it is an improved version based on our previous attacker 'Positive'. Besides, it comprises several components as following
+This offensive agent is implemented based on section 3, and it is an improved version compared to our previous attacker 'Positive'. Besides, it comprises several components as following
 
 - Picking an entrance to the enemy's territory based on current observation. We mask the entrances in about 3 Manhattan distance of the enemies. Meanwhile, we assign a counter to each entrance. Every step we increase one for those counters and we penalize those masked entrances by five. Before we pick the entrance, we calculate the maze distance from each entrance to its nearest food combining with the counter value to choose the best entrance.
 
@@ -152,10 +153,23 @@ Five Heuristic used (see **myTeam.py** for detailed implementations)
         "the heurisitic for changing entry point to the enemy territory"
 ```
 
+#### 'Negative' Agent
+This agent is our defensive agent, which is implemented by setting different goals and heuristics in different scenarios. For example:
+- If enemy pacman is nearby and our defender is not scared, it will run towards the enemy using DetectOpponentPacmansHeuristic
+- Otherwise, if any food is eaten, it would set the food position as goal, and run towrads the goal using
+noCrossingHeuristic.
+- If there is no goal, we will let our defender run towards the boundary, and if our agent is already at the boudary, we will let it go on patrol between the cloest entry point and furthest entry point.
+- And so on...
+
+Appartenly, the logic of our defender is not rigorous enough, in particular, we did not consider how to block enemy pacman's path back home, and only considered chasing enemy.
+
+It would be also be better if we can incorporate more knowledge from section 3 into our defender.
+
+#### 'Positive' Agent
+This is our preliminary version of offensive agent, it adopts a similar apporach as our 'Negative' Agent by setting diffrent destinations at each step. It is very basic as it only use one heuristics DetectOpponentGhostsHeuristic. As our improved version of attacker 'Friendly' has a better performance, this agent would not be used in the final contest, but you can still find it in the code if are interested.
 
 
-
-## 3.3 Monte Carlo Tree Search
+## 4.3 Monte Carlo Tree Search
 #### - Design
 The idea is that at each state, we build a search tree by simulating the game for a number of iterations. And then we select the next game state by comparing the UCB value of all successor states.
 
@@ -227,9 +241,9 @@ This is a critical part of the simulation, and we find it difficult to devise a 
 In this type of adversarial game, normally we should also simulate opponent's behaviour, we tried to implement in this way, but it seems to be quite complex, so in the end, we only consider simulating our own agent's behaviour.
 
 
-# 4. Experiment and Approach Evaluation
+# 5. Experiment and Approach Evaluation
 For each algorithm, we collect 5 game results against staff teams and analyse their performance.
-## 4.1 A* Heuristic Search
+## 5.1 A* Heuristic Search
 | A*                | Result 1     | Result 2        | Result 3     | Result 4   | Result 5   |
 |-----------------  |:-------------|:--------------- |:-------------|:-----------|:-----------|
 | Game Date Time    |15 Oct 10:00  |15 Oct 12:00     |15 Oct 2:00   |15 Oct 4:00 |15 Oct 6:00 |   
@@ -242,7 +256,7 @@ The result suggests that our A* agents have a moderate performance. Sometimes, w
 
 From some game replays, we find out that in those games we lose, the main reason is that our defender does not defend the right gate from invading or our attacker cannot choose a better entry point for attacking. This indicates that our strategy for choosing the entrance is still problematic to some extent.  
 
-## 4.2 Monte Carlo Tree Search
+## 5.2 Monte Carlo Tree Search
 | MCTS              | Result 1     | Result 2        | Result 3     | Result 4   | Result 5  |
 |-----------------  |:-------------|:--------------- |:-------------|:-----------|:----------|
 | Game Date Time    |9 Oct 16:00   |9 Oct 18:00      |9 Oct 20:00   |9 Oct 22:00 |10 Oct 8:00 |   
@@ -258,7 +272,7 @@ Clearly, the design is somewhat flawed, we reckon the most controversial part is
 We tried to modify this technique, but the result is still not very good. Given the time constraint, we decided to put more effort into the A* Heuristic Algorithm.
 
 
-# 5. Improvements and Reflections
+# 6. Improvements and Reflections
 By the end of this project, although we did not achieve a satisfying result in the competition, we do have gained a better understanding of different AI planning techniques. We discussed some aspects which can be improved in the future, including general improvements as well as method-specific improvements.
 
 ## General Improvements
@@ -272,8 +286,8 @@ It turns out that our two agents are acting on their own without considering the
 #### A* Heuristic Search
 1. Improve the selection of entry points for both attacker and defender to avoid deadlock.
 2. Our current agent does not consider eating capsule proactively, as we do not know if it is worth giving priority to capsule over food. We need to think further about the logic of eating capsule.
-3. Consider other suitable heuristics.
-4. Add more condition judgement.
+3. Consider other suitable heuristics and possible goals.
+4. Add more condition judgement, espcially for our defensive agent.
 
 #### Monte Carlo Tree Search
 1. Redesign the weights and features or use other ways to evaluate rewards
