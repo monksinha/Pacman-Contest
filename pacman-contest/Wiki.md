@@ -6,7 +6,7 @@
 - 2 &nbsp; Game Analysis
     - 2.1 &nbsp; Basics
     - 2.2 &nbsp; Estimate Enemies Position
-    - 3.3 &nbsp; Determine Dead End
+    - 3.3 &nbsp; Determine Blind Alley (Dead End)
 - 3 &nbsp; Design and Challenges
     - 3.1 &nbsp; Choices of Techniques
     - 3.2 &nbsp; A* Heuristic Search
@@ -15,12 +15,15 @@
 - 5 &nbsp; Improvements and Reflections
 
 
+
 **Team Name:**  Greatest-Jagras
+
 **Team Members:**
 * Zhengyu Chen - zhengyuc@student.unimelb.edu.au - 991678
 * Junrong Su - junrongs@student.unimelb.edu.au - 963294
 * Yang Lu - yang.lu1@student.unimelb.edu.au - 985419
 
+**Important Note**: In the project repository, **myTeam.py** is for A* algorithm, **myTeam2.py** is for MCTS algorithm.
 
 # 0. Youtube presentation
 Video Link: https://youtu.be/IrAce-rT7-Y
@@ -30,7 +33,6 @@ Or Click <a href= "https://youtu.be/IrAce-rT7-Y"> Here </a> For the video
 # 1. Introduction
 The goal of this project is to implement two autonomous agents which collaborate and try to eat the food in the opponent's territory while defending the food on our own side. See [UC Berkely CS188](http://ai.berkeley.edu/contest.html) for detailed specification of this project.
 
-**Note**: In the project repository, **myTeam.py** is for A* algorithm, **myTeam2.py** is for MCTS algorithm.
 
 # 2. Game Analysis
 As we started this project, we discussed some important aspects that could affect our designs and implementations.
@@ -65,21 +67,21 @@ What can we do more based on this idea? Now we only use current and previous one
 
 To better estimate enemies' positions, we could have another prior distribution(currently, we use uniform distribution), such as beta distribution which is conjugate prior to help us analyse whether the enemy is chasing us.
 
-## 2.3 Determine dead end
+## 2.3 Determine Blind Alley
 
 First thing first, in theory, this thing won't bother us if we use a Monte Carlo Tree Search as long as we simulate steps more than twice of the depth of alley and we would get back to the entrance at the right time. However, that takes huge computing resources and is impractical in our case due to limited computing time and hardware. Now, let's cut to the chase.
 
 #### Why this matters?
 
-Assume that we are at the entrance of a dead end and the distance with our enemy is six. According to the rules, both of us don't have sight to know each other. The minimum steps for the enemy to this entrance is six and if we choose to eat food whose depth at least three in this alley, then bad thing happens. We are stuck in this alley since the enemy is already waiting at the entrance. In another case, if we choose to eat food with depth two, then we need four steps from this entrance back to this entrance. Even if the distance between me and my enemy is five, I still have one spare step to run away.
+Assume that we are at the entrance of a blind alley and the distance with our enemy is six. According to the rules, both of us don't have sight to know each other. The minimum steps for the enemy to this entrance is six and if we choose to eat food whose depth at least three in this alley, then bad thing happens. We are stuck in this alley since the enemy is already waiting at the entrance. In another case, if we choose to eat food with depth two, then we need four steps from this entrance back to this entrance. Even if the distance between me and my enemy is five, I still have one spare step to run away.
 
-#### How to find dead end ahead?
+#### How to find blind alley ahead?
 
  A simple implementation is, for all legal positions, we get its successors and the end of the alley should have only one successor pointing to the entrance. Then we continuously get the successors of the previous successors which points to the entrance. These positions form the main part of the alley. The last is about when we stop the loop. Indeed, the entrance of this problem is a vertex of a cycle(graph theory). Therefore, we should find all cycles in the enemy's territory.
 
 #### What's next?
 
-After we find all dead ends, we can count the maze distance between inner food and the entrance. Every time, when we decide to eat a certain food inside an alley, we should promise that the cost/steps of starting from the current position to that food and then come back to the entrance should less than the maze distance between our enemy with that entrance. The discrepancy is the distance between us when we come back. 
+After we find all blind alleys, we can count the maze distance between inner food and the entrance. Every time, when we decide to eat a certain food inside an alley, we should promise that the cost/steps of starting from the current position to that food and then come back to the entrance should less than the maze distance between our enemy with that entrance. The discrepancy is the distance between us when we come back. 
 
 #### More thoughts about cycle
 
@@ -157,7 +159,7 @@ Five Heuristic used (see **myTeam.py** for detailed implementations)
 #### - Design
 The idea is that at each state, we build a search tree by simulating the game for a number of iterations. And then we select the next game state by comparing the UCB value of all successor states.
 
-As there are many variations of Monte Carlo Tree Search, we follow the algorithms introduced in this video: https://www.youtube.com/watch?v=UXW2yZndl7U
+As there are many variations of Monte Carlo Tree Search, we follow the algorithms introduced <a href="https://www.youtube.com/watch?v=UXW2yZndl7U">here</a>
 
 During a simulation, we compute the reward for agents by summing up features*weights value.
 
