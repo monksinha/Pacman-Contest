@@ -10,8 +10,8 @@
     - 3.3 &nbsp; Determine Blind Alley (Dead End)
 - 4 &nbsp; Design and Challenges
     - 4.1 &nbsp; Choices of Techniques
-    - 4.2 &nbsp; A* Heuristic Search
-    - 4.3 &nbsp; Monte Carlo Tree Search
+    - 4.2 &nbsp; A* Heuristic Search (myTeam.py)
+    - 4.3 &nbsp; Monte Carlo Tree Search (myTeam2.py)
 - 5 &nbsp; Experiments and Approach Evaluation
 - 6 &nbsp; Improvements and Reflections
 
@@ -27,7 +27,7 @@
 **Important Note**: In the project repository, **myTeam.py** is for A* algorithm, **myTeam2.py** is for MCTS algorithm.
 
 # 1. Youtube presentation
-Video Link: https://youtu.be/IrAce-rT7-Y
+**Video Link**: https://youtu.be/IrAce-rT7-Y
 
 Or Click <a href= "https://youtu.be/IrAce-rT7-Y"> Here </a> For the video
 
@@ -107,7 +107,7 @@ For the candidate techniques, we analysed that:
 
 Given the above considerations, we decided to implement **A\* Heuristic Search** and **Monte Carlo Tree Search** for the project.
   
-## 4.2 A* Heuristic Search
+## 4.2 A* Heuristic Search (myTeam.py)
 #### 'Friendly' Agent
 
 This offensive agent is implemented based on section 3, and it is an improved version compared to our previous attacker 'Positive'. Besides, it comprises several components as following
@@ -169,7 +169,7 @@ It would be also be better if we can incorporate more knowledge from section 3 i
 This is our preliminary version of offensive agent, it adopts a similar apporach as our 'Negative' Agent by setting diffrent destinations at each step. It is very basic as it only use one heuristics DetectOpponentGhostsHeuristic. As our improved version of attacker 'Friendly' has a better performance, this agent would not be used in the final contest, but you can still find it in the code if are interested.
 
 
-## 4.3 Monte Carlo Tree Search
+## 4.3 Monte Carlo Tree Search (myTeam2.py)
 #### - Design
 The idea is that at each state, we build a search tree by simulating the game for a number of iterations. And then we select the next game state by comparing the UCB value of all successor states.
 
